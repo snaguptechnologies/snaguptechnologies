@@ -24,7 +24,16 @@ export default function Navbar() {
 
     useEffect(() => {
         const storedUser = localStorage.getItem("snagup_user");
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (e) {
+                console.error("Failed to parse stored user", e);
+                setUser(null);
+            }
+        } else {
+            setUser(null);
+        }
     }, [pathname]);
 
     useEffect(() => {

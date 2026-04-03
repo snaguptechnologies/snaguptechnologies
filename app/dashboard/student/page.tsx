@@ -396,7 +396,7 @@ export default function StudentDashboard() {
             <aside 
                 onMouseEnter={() => setIsSidebarCollapsed(false)}
                 onMouseLeave={() => setIsSidebarCollapsed(true)}
-                className={`hidden md:flex flex-col border-r border-border bg-card/60 backdrop-blur-2xl sticky top-0 h-screen shrink-0 p-6 transition-all duration-500 ease-in-out group/sidebar ${isSidebarCollapsed ? 'w-24' : 'w-72 shadow-2xl shadow-primary/5'}`}
+                className={`hidden md:flex flex-col border-r border-border bg-card/60 backdrop-blur-2xl sticky top-0 h-screen shrink-0 p-6 transition-all duration-500 ease-in-out group/sidebar overflow-hidden ${isSidebarCollapsed ? 'w-24' : 'w-72 shadow-2xl shadow-primary/5'}`}
             >
                 <div className="mb-12 px-2 flex items-center justify-between">
                     {!isSidebarCollapsed ? (
@@ -410,7 +410,7 @@ export default function StudentDashboard() {
                     )}
                 </div>
 
-                <nav className="space-y-4 flex-1">
+                <nav className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar py-2">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
@@ -476,7 +476,7 @@ export default function StudentDashboard() {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar relative z-10">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10 custom-scrollbar relative z-10">
                     <div className="max-w-7xl mx-auto">
                         <div className="mb-12">
                             <h1 className="text-3xl font-black text-foreground tracking-tight mb-2 uppercase">
