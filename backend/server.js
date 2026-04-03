@@ -35,7 +35,9 @@ app.use(cors({
         if (!origin) return callback(null, true);
         
         // Dynamic origin check
-        const isAllowed = allowedOrigins.some(ao => origin.startsWith(ao));
+        // We support '*' for total openness or specific prefix matches
+        const isAllowed = allowedOrigins.includes('*') || 
+                         allowedOrigins.some(ao => origin.startsWith(ao));
         
         if (isAllowed) {
             callback(null, true);
