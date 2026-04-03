@@ -6,7 +6,11 @@ async function test() {
         host: process.env.DB_HOST || 'localhost',
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || '',
-        port: parseInt(process.env.DB_PORT || '3306')
+        port: parseInt(process.env.DB_PORT || '3306'),
+        ssl: {
+            minVersion: 'TLSv1.2',
+            rejectUnauthorized: true
+        }
     };
     console.log("Testing Connection with:", config);
     try {

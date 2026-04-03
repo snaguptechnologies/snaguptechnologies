@@ -10,7 +10,11 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true
+  multipleStatements: true,
+  ssl: {
+    minVersion: 'TLSv1.2',
+    rejectUnauthorized: true
+  }
 };
 
 const dbName = process.env.DB_NAME || 'snagup';
@@ -27,7 +31,8 @@ async function ensureDatabaseExists() {
             host: dbConfig.host,
             user: dbConfig.user,
             password: dbConfig.password,
-            port: dbConfig.port
+            port: dbConfig.port,
+            ssl: dbConfig.ssl
         });
         
         await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);

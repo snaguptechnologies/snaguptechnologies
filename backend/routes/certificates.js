@@ -47,7 +47,7 @@ async function generateCertificateInternal(student_id, batch_id, custom_cert_id 
   };
 
   const siteName     = getSetting('site_name',     'Snagup Technologies');
-  const siteUrlSetting = getSetting('site_url', 'http://localhost:3000');
+  const siteUrlSetting = process.env.FRONTEND_URL || getSetting('site_url', 'http://localhost:3000');
   
   // Generate cert ID (only if not provided)
   let cert_id = custom_cert_id;

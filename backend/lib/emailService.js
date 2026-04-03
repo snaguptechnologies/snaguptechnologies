@@ -3,16 +3,21 @@ const dotenv = require('dotenv');
 const db = require('../db/database');
 dotenv.config();
 
-// Dynamic site URL — reads from Admin System Settings (site_url key)
-// Falls back to SITE_URL env var, then localhost for dev
+// Dynamic site URL — reads from FRONTEND_URL env var, then Admin System Settings
 const getSiteUrl = async () => {
+    // 1. Priority: Environment Variable (most reliable for production hosting)
+    if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.replace(/\/$/, '');
+
+    // 2. Secondary: Admin System Settings
     try {
         const [rows] = await db.execute(`SELECT \`value\` FROM settings WHERE \`key\` = 'site_url'`);
         if (rows.length > 0 && rows[0].value && rows[0].value !== 'http://localhost:3000') {
-            return rows[0].value.replace(/\/$/, ''); // strip trailing slash
+            return rows[0].value.replace(/\/$/, '');
         }
     } catch (e) { /* db not ready yet */ }
-    return process.env.SITE_URL || 'http://localhost:3000';
+
+    // 3. Last Resort: Localhost Default
+    return 'http://localhost:3000';
 };
 
 // Create reusable transporter object using the default SMTP transport

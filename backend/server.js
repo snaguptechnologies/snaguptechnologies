@@ -22,7 +22,12 @@ app.use('/api/auth/login', authLimiter);
 // e.g. ALLOWED_ORIGINS=https://snagup.com,https://www.snagup.com
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://localhost:3000'];
+    : [
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000', 
+        'https://localhost:3000',
+        process.env.FRONTEND_URL // Also include FRONTEND_URL if set
+      ].filter(Boolean);
 
 app.use(cors({
     origin: function (origin, callback) {
