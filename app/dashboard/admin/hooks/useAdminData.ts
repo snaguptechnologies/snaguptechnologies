@@ -476,7 +476,7 @@ export const useAdminData = () => {
                 
                 setCourses(cRes.data);
                 setBatches(bRes.data);
-            } else if (tab === 'settings') {
+            } else if (tab === 'settings' || tab === 'system_settings') {
                 const timestamp = Date.now();
                 const dashRes = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
                 const setRes = await axios.get(`${API_ENDPOINTS.SETTINGS}?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
