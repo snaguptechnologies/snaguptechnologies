@@ -119,9 +119,23 @@ export const useAdminData = () => {
     // Settings states
     const [profileForm, setProfileForm] = useState({ name: "", email: "", phone: "" });
     const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    const [upiSettings, setUpiSettings] = useState({ upi_id: "", upi_qr_image: "", razorpay_key_id: "", razorpay_key_secret: "" });
+    const [upiSettings, setUpiSettings] = useState({ 
+        upi_id: "", 
+        upi_qr_image: "", 
+        razorpay_key_id: "", 
+        razorpay_key_secret: "" 
+    });
     const [upiSaving, setUpiSaving] = useState(false);
-    const [generalSettings, setGeneralSettings] = useState({ site_name: "", site_url: "", site_logo: "", contact_email: "", contact_phone: "" });
+    const [generalSettings, setGeneralSettings] = useState({ 
+        site_name: "", 
+        site_url: "", 
+        site_logo: "", 
+        favicon_url: "",
+        contact_email: "", 
+        contact_phone: "",
+        site_description: "",
+        site_keywords: ""
+    });
     const [genSaving, setGenSaving] = useState(false);
     const [notifSettings, setNotifSettings] = useState<string[]>([]);
     const [notifSaving, setNotifSaving] = useState(false);
@@ -474,19 +488,26 @@ export const useAdminData = () => {
                         phone: dashRes.data.user.phone || ""
                     });
                 }
+                
+                // Prefill ALL fields from backend response
                 setGeneralSettings({
-                    site_name: setRes.data.site_name || "Snagup Technologies",
-                    site_url: setRes.data.site_url || "http://localhost:3000",
+                    site_name: setRes.data.site_name || "",
+                    site_url: setRes.data.site_url || "",
                     site_logo: setRes.data.site_logo || "",
+                    favicon_url: setRes.data.favicon_url || "",
                     contact_email: setRes.data.contact_email || "",
-                    contact_phone: setRes.data.contact_phone || ""
+                    contact_phone: setRes.data.contact_phone || "",
+                    site_description: setRes.data.site_description || "",
+                    site_keywords: setRes.data.site_keywords || ""
                 });
+
                 setUpiSettings({
                     upi_id: setRes.data.upi_id || '',
                     upi_qr_image: setRes.data.upi_qr_image || '',
                     razorpay_key_id: setRes.data.razorpay_key_id || '',
                     razorpay_key_secret: setRes.data.razorpay_key_secret || ''
                 });
+
                 try {
                     const reminders = JSON.parse(setRes.data.session_reminders || "[60, 30]");
                     setNotifSettings(reminders.map(String));
@@ -870,12 +891,65 @@ export const useAdminData = () => {
         }
     };
 
-    const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Helper for Image Compression
+    const compressImage = (file: File, maxWidth: number = 800): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ratio = maxWidth / img.width;
+                    if (img.width > maxWidth) {
+                        canvas.width = maxWidth;
+                        canvas.height = img.height * ratio;
+                    } else {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                    }
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality JPEG
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => setUpiSettings(prev => ({ ...prev, upi_qr_image: reader.result as string }));
-        reader.readAsDataURL(file);
+        try {
+            const compressed = await compressImage(file, 400); // Logos don't need to be huge
+            setGeneralSettings(prev => ({ ...prev, site_logo: compressed }));
+        } catch (err) {
+            showToast("Logo upload failed", "error");
+        }
+    };
+
+    const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImage(file, 64); // Favicons are tiny
+            setGeneralSettings(prev => ({ ...prev, favicon_url: compressed }));
+        } catch (err) {
+            showToast("Favicon upload failed", "error");
+        }
+    };
+
+    const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImage(file, 600); // QR codes need some detail
+            setUpiSettings(prev => ({ ...prev, upi_qr_image: compressed }));
+        } catch (err) {
+            showToast("QR upload failed", "error");
+        }
     };
 
     const handleSaveUpiSettings = async (e: React.FormEvent) => {

@@ -9,6 +9,7 @@ interface SettingsTabProps {
     handleSaveGeneralSettings: (e: React.FormEvent) => void;
     genSaving: boolean;
     handleLogoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    handleFaviconUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     profileForm: any;
     setProfileForm: (form: any) => void;
     handleUpdateProfile: (e: React.FormEvent) => void;
@@ -43,6 +44,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     handleSaveGeneralSettings,
     genSaving,
     handleLogoUpload,
+    handleFaviconUpload,
     profileForm,
     setProfileForm,
     handleUpdateProfile,
@@ -159,7 +161,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                                     <input
                                                         type="text"
                                                         required
-                                                        value={generalSettings.site_name}
+                                                        value={generalSettings.site_name || ""}
                                                         onChange={e => setGeneralSettings({ ...generalSettings, site_name: e.target.value })}
                                                         className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold"
                                                     />
@@ -169,7 +171,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                                     <input
                                                         type="email"
                                                         required
-                                                        value={generalSettings.contact_email}
+                                                        value={generalSettings.contact_email || ""}
                                                         onChange={e => setGeneralSettings({ ...generalSettings, contact_email: e.target.value })}
                                                         className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
                                                     />
@@ -178,7 +180,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                                     <label className="text-xs font-semibold text-muted-foreground ml-1">Contact Phone</label>
                                                     <input
                                                         type="text"
-                                                        value={generalSettings.contact_phone}
+                                                        value={generalSettings.contact_phone || ""}
                                                         onChange={e => setGeneralSettings({ ...generalSettings, contact_phone: e.target.value })}
                                                         className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
                                                     />
@@ -189,34 +191,79 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                                         type="text"
                                                         required
                                                         placeholder="e.g. http://localhost:3000 or https://snagup.com"
-                                                        value={generalSettings.site_url}
+                                                        value={generalSettings.site_url || ""}
                                                         onChange={e => setGeneralSettings({ ...generalSettings, site_url: e.target.value })}
                                                         className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
                                                     />
                                                     <p className="text-[10px] text-muted-foreground ml-1 italic">* This URL is used to generate the verification QR code printed on certificates.</p>
                                                 </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-muted-foreground ml-1">SEO Site Description</label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={generalSettings.site_description || ""}
+                                                        onChange={e => setGeneralSettings({ ...generalSettings, site_description: e.target.value })}
+                                                        className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium resize-none text-xs"
+                                                        placeholder="Enter site description for Google search results..."
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-semibold text-muted-foreground ml-1">SEO Keywords</label>
+                                                    <input
+                                                        type="text"
+                                                        value={generalSettings.site_keywords || ""}
+                                                        onChange={e => setGeneralSettings({ ...generalSettings, site_keywords: e.target.value })}
+                                                        className="w-full bg-background border border-border rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-xs"
+                                                        placeholder="e.g. education, training, coaching"
+                                                    />
+                                                </div>
                                             </div>
 
-                                            <div className="space-y-4 md:space-y-6">
-                                                <label className="text-xs font-semibold text-muted-foreground ml-1">Site Logo</label>
-                                                <div className="p-6 md:p-8 border-2 border-dashed border-border rounded-[2rem] flex flex-col items-center justify-center text-center gap-4 hover:border-indigo-500/50 transition-all cursor-pointer relative group/logo">
-                                                    {generalSettings.site_logo ? (
-                                                        <img src={generalSettings.site_logo} alt="Logo" className="h-20 object-contain" />
-                                                    ) : (
-                                                        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                                                            <Globe className="w-8 h-8 text-muted-foreground" />
+                                            <div className="space-y-8">
+                                                <div className="space-y-4">
+                                                    <label className="text-xs font-semibold text-muted-foreground ml-1">Site Logo</label>
+                                                    <div className="p-6 md:p-8 border-2 border-dashed border-border rounded-[2rem] flex flex-col items-center justify-center text-center gap-4 hover:border-indigo-500/50 transition-all cursor-pointer relative group/logo bg-muted/20">
+                                                        {generalSettings.site_logo ? (
+                                                            <img src={generalSettings.site_logo} alt="Logo" className="h-20 object-contain" />
+                                                        ) : (
+                                                            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                                                                <Globe className="w-8 h-8 text-muted-foreground" />
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="text-xs font-bold text-foreground">Drop your logo here</p>
+                                                            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">PNG or SVG Recommended</p>
                                                         </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="text-xs font-bold text-foreground">Drop your logo here</p>
-                                                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">PNG or SVG Recommended</p>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleLogoUpload}
+                                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        />
                                                     </div>
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={handleLogoUpload}
-                                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                                    />
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <label className="text-xs font-semibold text-muted-foreground ml-1 text-center block w-full">Favicon (Browser Icon)</label>
+                                                    <div className="flex items-center gap-6 p-4 bg-muted/30 border border-border/50 rounded-3xl">
+                                                        <div className="w-16 h-16 rounded-2xl bg-background border border-border flex items-center justify-center shrink-0 overflow-hidden relative group/favicon">
+                                                            {generalSettings.favicon_url ? (
+                                                                <img src={generalSettings.favicon_url} alt="Favicon" className="w-8 h-8 object-contain" />
+                                                            ) : (
+                                                                <Globe className="w-8 h-8 text-muted-foreground" />
+                                                            )}
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                onChange={handleFaviconUpload}
+                                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className="text-xs font-black text-foreground uppercase tracking-widest mb-1">Website Icon</p>
+                                                            <p className="text-[10px] text-muted-foreground">Click the box to upload a 32x32 or 64x64 icon.</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

@@ -65,7 +65,7 @@ export default function AdminDashboard() {
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch, handleDeleteUser, 
         handleOfficialClose, handleGenerateCert, openEnrollmentsModal, openCertModal, 
         preloadDropdowns, handleChangePassword, openEditDeadline, handleSelectAllBatches, 
-        handleToggleBatchSelection, handleStartBatch, handleLogoUpload, getLocalDatetime, setToast, setAttendanceData, emailLogs,
+        handleToggleBatchSelection, handleStartBatch, handleLogoUpload, handleFaviconUpload, getLocalDatetime, setToast, setAttendanceData, emailLogs,
         certificates, certSearch, setCertSearch, certCourseFilter, setCertCourseFilter, certBatchFilter, setCertBatchFilter, filteredCertificates, handleDeleteCertificate,
         dashboardSubTab, setDashboardSubTab, handleExport,
         dateRange, setDateRange, chartCourseFilter, setChartCourseFilter, 
