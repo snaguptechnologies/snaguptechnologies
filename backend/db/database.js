@@ -203,7 +203,7 @@ async function initializeTables() {
       )`,
       `CREATE TABLE IF NOT EXISTS settings (
         \`key\` VARCHAR(255) PRIMARY KEY,
-        \`value\` TEXT
+        \`value\` LONGTEXT
       )`,
       `CREATE TABLE IF NOT EXISTS email_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,

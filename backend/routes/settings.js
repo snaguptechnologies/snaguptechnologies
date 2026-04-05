@@ -49,10 +49,13 @@ router.put('/', authenticateToken, requireRole('admin'), async (req, res) => {
         await connection.beginTransaction();
 
         for (const [key, value] of Object.entries(settings)) {
-            await connection.execute(`
+            // Handle null/undefined values properly
+            const finalValue = (value === null || value === undefined) ? null : String(value);
+            
+            await connection.query(`
                 INSERT INTO settings (\`key\`, \`value\`) VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)
-            `, [key, String(value)]);
+            `, [key, finalValue]);
         }
 
         await connection.commit();
