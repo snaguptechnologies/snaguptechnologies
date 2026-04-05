@@ -73,11 +73,17 @@ router.post('/reset-database', authenticateToken, requireRole('admin'), async (r
             'payments', 'sessions', 'attendance', 'batches', 'courses', 
             'service_inquiries', 'email_logs', 'settings', 'users'
         ];
+
+        // Disable foreign key checks for a clean wipe
+        await db.query('SET FOREIGN_KEY_CHECKS = 0');
         
         // Drop all tables
         for (const table of tables) {
-            await db.execute(`DROP TABLE IF EXISTS ${table}`);
+            await db.query(`DROP TABLE IF EXISTS ${table}`);
         }
+        
+        // Re-enable foreign key checks
+        await db.query('SET FOREIGN_KEY_CHECKS = 1');
         
         // Re-initialize tables and admin account
         if (typeof db.initializeDatabase === 'function') {
@@ -86,11 +92,13 @@ router.post('/reset-database', authenticateToken, requireRole('admin'), async (r
             throw new Error("initializeDatabase function not exported from db object");
         }
         
-        console.log(`[ADMIN] Factory Reset performed by user: ${req.user.email}`);
+        console.log(`[ADMIN] Factory Reset successfully performed by user: ${req.user.email}`);
         res.json({ message: 'Database wiped and factory reset successfully.' });
     } catch (err) {
         console.error("❌ Failed to reset database:", err);
-        res.status(500).json({ error: 'Failed to reset the database completely' });
+        // Ensure keys are enabled even on failure
+        try { await db.query('SET FOREIGN_KEY_CHECKS = 1'); } catch(e){}
+        res.status(500).json({ error: `Failed to reset: ${err.message}` });
     }
 });
 
