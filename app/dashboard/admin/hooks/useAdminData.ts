@@ -1272,7 +1272,7 @@ export const useAdminData = () => {
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch,
         handleDeleteUser, handleOfficialClose, handleGenerateCert, openEnrollmentsModal,
         openCertModal, preloadDropdowns, handleChangePassword, openEditDeadline,
-        handleSelectAllBatches, handleToggleBatchSelection, handleStartBatch, handleLogoUpload,
+        handleSelectAllBatches, handleToggleBatchSelection, handleStartBatch, handleLogoUpload, handleFaviconUpload,
         getLocalDatetime, setToast, setAttendanceData, handleDeleteCertificate, handleExport
     };
 };
