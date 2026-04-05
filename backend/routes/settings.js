@@ -70,7 +70,8 @@ router.post('/reset-database', authenticateToken, requireRole('admin'), async (r
     try {
         const tables = [
             'certificates', 'batch_materials', 'waitlist', 'enrollments', 
-            'attendance', 'batches', 'courses', 'inquiries', 'email_logs', 'settings', 'users'
+            'payments', 'sessions', 'attendance', 'batches', 'courses', 
+            'service_inquiries', 'email_logs', 'settings', 'users'
         ];
         
         // Drop all tables

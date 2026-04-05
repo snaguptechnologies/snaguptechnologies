@@ -26,10 +26,12 @@ const tables = [
   'batch_materials',
   'waitlist',
   'enrollments',
+  'payments',
+  'sessions',
   'attendance',
   'batches',
   'courses',
-  'inquiries',
+  'service_inquiries',
   'email_logs',
   'settings',
   'users'

@@ -55,9 +55,8 @@ async function ensureDatabaseExists() {
 async function initializeTables() {
   try {
     const connection = await pool.getConnection();
-
-    const schema = `
-      CREATE TABLE IF NOT EXISTS users (
+    const tables = [
+      `CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
@@ -68,9 +67,8 @@ async function initializeTables() {
         reset_otp VARCHAR(255),
         reset_otp_expires DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS courses (
+      )`,
+      `CREATE TABLE IF NOT EXISTS courses (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         description TEXT,
@@ -79,9 +77,8 @@ async function initializeTables() {
         status ENUM('active','inactive') DEFAULT 'active',
         thumbnail VARCHAR(255),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS batches (
+      )`,
+      `CREATE TABLE IF NOT EXISTS batches (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         course_id INT NOT NULL,
@@ -109,9 +106,8 @@ async function initializeTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
         FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE SET NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
+      )`,
+      `CREATE TABLE IF NOT EXISTS sessions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         batch_id INT NOT NULL,
         date DATETIME NOT NULL,
@@ -125,9 +121,8 @@ async function initializeTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(batch_id, date),
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS enrollments (
+      )`,
+      `CREATE TABLE IF NOT EXISTS enrollments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         batch_id INT NOT NULL,
@@ -141,9 +136,8 @@ async function initializeTables() {
         UNIQUE(student_id, batch_id),
         FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS payments (
+      )`,
+      `CREATE TABLE IF NOT EXISTS payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         enrollment_id INT NOT NULL,
         student_id INT NOT NULL,
@@ -154,9 +148,8 @@ async function initializeTables() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
         FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS attendance (
+      )`,
+      `CREATE TABLE IF NOT EXISTS attendance (
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         batch_id INT NOT NULL,
@@ -168,9 +161,8 @@ async function initializeTables() {
         FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
         FOREIGN KEY (marked_by) REFERENCES users(id) ON DELETE SET NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS certificates (
+      )`,
+      `CREATE TABLE IF NOT EXISTS certificates (
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         batch_id INT NOT NULL,
@@ -181,9 +173,8 @@ async function initializeTables() {
         UNIQUE(student_id, batch_id),
         FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS waitlist (
+      )`,
+      `CREATE TABLE IF NOT EXISTS waitlist (
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         batch_id INT NOT NULL,
@@ -191,9 +182,8 @@ async function initializeTables() {
         UNIQUE(student_id, batch_id),
         FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS service_inquiries (
+      )`,
+      `CREATE TABLE IF NOT EXISTS service_inquiries (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
@@ -202,23 +192,20 @@ async function initializeTables() {
         message TEXT,
         status ENUM('pending','contacted','archived') DEFAULT 'pending',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS batch_materials (
+      )`,
+      `CREATE TABLE IF NOT EXISTS batch_materials (
         id INT AUTO_INCREMENT PRIMARY KEY,
         batch_id INT NOT NULL,
         message TEXT,
         link TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS settings (
+      )`,
+      `CREATE TABLE IF NOT EXISTS settings (
         \`key\` VARCHAR(255) PRIMARY KEY,
         \`value\` TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS email_logs (
+      )`,
+      `CREATE TABLE IF NOT EXISTS email_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         recipient_email VARCHAR(255) NOT NULL,
         subject VARCHAR(255) NOT NULL,
@@ -227,13 +214,16 @@ async function initializeTables() {
         html TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'sent',
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
+      )`
+    ];
 
-    await connection.query(schema);
+    for (const sql of tables) {
+      await connection.query(sql);
+    }
+    
     console.log("✅ MySQL Database schema initialized.");
 
-    // Insert default settings natives
+    // Insert default settings
     const defaultSettings = [
       ['min_attendance_pct', '75'],
       ['cert_counter', '0'],
@@ -254,11 +244,12 @@ async function initializeTables() {
     }
 
     // Seed admin user
-    const [adminRows] = await connection.query('SELECT id FROM users WHERE email = ?', ['admin@snagup.com']);
+    const adminEmail = 'admin@snagup.com';
+    const [adminRows] = await connection.query('SELECT id FROM users WHERE email = ?', [adminEmail]);
     if (adminRows.length === 0) {
       const hash = bcrypt.hashSync('Admin@123', 10);
-      await connection.query('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)', ['Super Admin', 'admin@snagup.com', hash, 'admin']);
-      console.log('✅ Admin seeded: admin@snagup.com / Admin@123');
+      await connection.query('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)', ['Super Admin', adminEmail, hash, 'admin']);
+      console.log(`✅ Admin seeded: ${adminEmail} / Admin@123`);
     }
 
     connection.release();
