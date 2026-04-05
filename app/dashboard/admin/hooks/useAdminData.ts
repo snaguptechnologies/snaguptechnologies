@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 import { useAuthGuard } from "@/app/hooks/useAuthGuard";
+import { 
+    exportToExcel, 
+    formatStudentExport, 
+    formatPaymentExport, 
+    formatAttendanceExport, 
+    formatCertificateExport,
+    formatGraphExport,
+    formatFilteredEnrollmentExport
+} from "../lib/excelUtils";
 
 export const useAdminData = () => {
     const router = useRouter();
@@ -22,17 +31,24 @@ export const useAdminData = () => {
     const [attLoading, setAttLoading] = useState(false);
 
     // Active Tab with URL Hash Synchronization for Browser History
-    const [activeTab, _setActiveTab] = useState<'overview' | 'courses' | 'instructors' | 'students' | 'batches' | 'payments' | 'attendance' | 'settings' | 'system_settings' | 'inquiries' | 'emails' | 'certificates'>('overview');
+    const [activeTab, _setActiveTab] = useState<'dashboard' | 'courses' | 'instructors' | 'students' | 'batches' | 'payments' | 'attendance' | 'settings' | 'system_settings' | 'inquiries' | 'emails' | 'certificates'>('dashboard');
+    const [dashboardSubTab, setDashboardSubTab] = useState<'analytics' | 'financials'>('analytics');
+    const [dateRange, setDateRange] = useState<'week' | 'month' | 'year' | 'all' | 'custom'>('month');
+    const [customStartDate, setCustomStartDate] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+    const [customEndDate, setCustomEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [chartCourseFilter, setChartCourseFilter] = useState<string>('all');
+    const [chartBatchFilter, setChartBatchFilter] = useState<string>('all');
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const handleHashChange = () => {
                 const hash = window.location.hash.replace('#', '');
-                const validTabs = ['overview', 'courses', 'instructors', 'students', 'batches', 'payments', 'attendance', 'settings', 'system_settings', 'inquiries', 'emails', 'certificates'];
+                const validTabs = ['dashboard', 'overview', 'courses', 'instructors', 'students', 'batches', 'payments', 'attendance', 'settings', 'system_settings', 'inquiries', 'emails', 'certificates'];
                 if (validTabs.includes(hash)) {
-                    _setActiveTab(hash as any);
+                    const finalTab = hash === 'overview' ? 'dashboard' : hash;
+                    _setActiveTab(finalTab as any);
                 } else if (!hash) {
-                    _setActiveTab('overview');
+                    _setActiveTab('dashboard');
                 }
             };
             handleHashChange();
@@ -77,6 +93,7 @@ export const useAdminData = () => {
     const [studentSearch, setStudentSearch] = useState("");
     const [certSearch, setCertSearch] = useState("");
     const [certCourseFilter, setCertCourseFilter] = useState("all");
+    const [certBatchFilter, setCertBatchFilter] = useState("all");
 
     // Modal & UI states
     const [showCourseModal, setShowCourseModal] = useState(false);
@@ -111,9 +128,17 @@ export const useAdminData = () => {
     const [upiMessage, setUpiMessage] = useState<{ text: string; type: 'success' | 'error' | null }>({ type: null, text: "" });
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsMessage, setSettingsMessage] = useState<{ type: "success" | "error" | null, text: string }>({ type: null, text: "" });
-    const [settingsActiveTab, setSettingsActiveTab] = useState<'general' | 'profile' | 'payments' | 'notifications' | 'security'>('general');
+    const [settingsActiveTab, _setSettingsActiveTab] = useState<'general' | 'profile' | 'payments' | 'notifications' | 'security'>('general');
+    const setSettingsActiveTab = (tab: any) => {
+        setSettingsMessage({ type: null, text: "" });
+        _setSettingsActiveTab(tab);
+    };
     const [showPasswords, setShowPasswords] = useState({ current: false, new: false, verify: false });
     const [showInstPassword, setShowInstPassword] = useState(false);
+    const [selectedPayments, setSelectedPayments] = useState<number[]>([]);
+    const [rejectionModal, setRejectionModal] = useState<{ show: boolean, targetIds: number[], reason: string, isBulk: boolean }>({
+        show: false, targetIds: [], reason: "", isBulk: false
+    });
 
     // Filtered Data (useMemo)
     const filteredBatches = useMemo(() => {
@@ -189,14 +214,144 @@ export const useAdminData = () => {
                 c.cert_id.toLowerCase().includes(certSearch.toLowerCase()) ||
                 c.course_name.toLowerCase().includes(certSearch.toLowerCase());
             const matchesCourse = certCourseFilter === 'all' || c.course_name === certCourseFilter;
-            return matchesSearch && matchesCourse;
+            const matchesBatch = certBatchFilter === 'all' || c.batch_name === certBatchFilter;
+            return matchesSearch && matchesCourse && matchesBatch;
         });
-    }, [certificates, certSearch, certCourseFilter]);
+    }, [certificates, certSearch, certCourseFilter, certBatchFilter]);
 
     const attendanceBatches = useMemo(() => {
         if (!attCourseId) return batches;
         return batches.filter(b => b.course_id.toString() === attCourseId);
     }, [batches, attCourseId]);
+
+    // Graph Data Aggregation
+    const chartData = useMemo(() => {
+        const now = new Date();
+        const getStartDate = (range: string) => {
+            if (range === 'custom') return new Date(customStartDate);
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            if (range === 'week') d.setDate(d.getDate() - 6); // 7 days total
+            else if (range === 'month') d.setMonth(d.getMonth() - 1);
+            else if (range === 'year') d.setFullYear(d.getFullYear() - 1);
+            else return new Date(0);
+            return d;
+        };
+
+        const getEndDate = (range: string) => {
+            if (range === 'custom') return new Date(customEndDate);
+            return new Date();
+        };
+
+        const startDate = getStartDate(dateRange);
+        const endDate = getEndDate(dateRange);
+
+        // Filter Enrollments - Use 'enrolled_at' from backend schema
+        const filteredEnrollmentsForChart = enrollments.filter(e => {
+            const eDate = new Date(e.enrolled_at);
+            const matchesDate = eDate >= startDate && eDate <= endDate;
+            const matchesCourse = chartCourseFilter === 'all' || e.course_id?.toString() === chartCourseFilter;
+            const matchesBatch = chartBatchFilter === 'all' || e.batch_id?.toString() === chartBatchFilter;
+            return matchesDate && matchesCourse && matchesBatch;
+        });
+
+        // Filter Payments - Now with Course/Batch context
+        // Filter Payments - Using raw payment history from financials for accuracy
+        const filteredPaymentsForChart = (stats?.financials?.allPayments || []).filter((p: any) => {
+            const pDate = new Date(p.created_at);
+            const matchesDate = pDate >= startDate && pDate <= endDate;
+            const matchesStatus = p.status === 'completed';
+            const matchesCourse = chartCourseFilter === 'all' || p.course_id?.toString() === chartCourseFilter;
+            const matchesBatch = chartBatchFilter === 'all' || p.batch_id?.toString() === chartBatchFilter;
+            return matchesDate && matchesStatus && matchesCourse && matchesBatch;
+        });
+
+        // Chronological groupByDate with Local Time Normalization - Total Robustness
+        const getChronologicalData = (data: any[], dateKey: string, valueKey?: string, isCumulative: boolean = false) => {
+            const result: { name: string; key: string; value: number }[] = [];
+            const tempMap: Record<string, number> = {};
+
+            const normLocal = (d: Date) => {
+                const Y = d.getFullYear();
+                const M = String(d.getMonth() + 1).padStart(2, '0');
+                const D = String(d.getDate()).padStart(2, '0');
+                return (dateRange === 'week' || dateRange === 'month' || dateRange === 'custom') ? `${Y}-${M}-${D}` : `${Y}-${M}`;
+            };
+
+            const getLabel = (d: Date) => {
+                if (dateRange === 'week') return d.toLocaleDateString('en-IN', { weekday: 'short' });
+                if (dateRange === 'month' || dateRange === 'custom') return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                return d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+            };
+
+            let count = 12;
+            if (dateRange === 'week') count = 7;
+            else if (dateRange === 'month') count = 30;
+            else if (dateRange === 'custom') {
+                const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+                count = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                if (count > 366) count = 366; 
+            }
+
+            for (let i = count - 1; i >= 0; i--) {
+                const d = new Date(endDate);
+                if (dateRange === 'week' || dateRange === 'month' || dateRange === 'custom') {
+                    d.setDate(d.getDate() - i);
+                } else {
+                    d.setDate(1);
+                    d.setMonth(d.getMonth() - i);
+                }
+                const key = normLocal(d);
+                tempMap[key] = 0;
+                result.push({ name: getLabel(d), key, value: 0 });
+            }
+
+            data.forEach(item => {
+                const rawDate = item[dateKey];
+                if (!rawDate) return;
+                const d = new Date(rawDate);
+                if (isNaN(d.getTime())) return;
+                const key = normLocal(d);
+                if (tempMap.hasOwnProperty(key)) {
+                    const val = valueKey ? parseFloat(item[valueKey] || 0) : 1;
+                    if (!isNaN(val)) tempMap[key] += val;
+                }
+            });
+
+            let runningSum = 0;
+            return result.map(bucket => {
+                if (isCumulative) {
+                    runningSum += tempMap[bucket.key] || 0;
+                    return { name: bucket.name, key: bucket.key, value: Number(runningSum.toFixed(2)) };
+                }
+                return { name: bucket.name, key: bucket.key, value: Number((tempMap[bucket.key] || 0).toFixed(2)) };
+            });
+        };
+
+        const activeProgress = (stats?.activeBatchProgress || [])
+            .filter((b: any) => {
+                const matchCourse = chartCourseFilter === 'all' || b.course_id?.toString() === chartCourseFilter;
+                const matchBatch = chartBatchFilter === 'all' || b.id?.toString() === chartBatchFilter;
+                return matchCourse && matchBatch;
+            })
+            .map((b: any) => ({
+                name: b.name,
+                course: b.course_name,
+                status: b.batch_status,
+                completed: b.sessions_completed || 0,
+                total: b.duration_days || 0,
+                full: 100,
+                percentage: Math.min(100, Math.round(((b.sessions_completed || 0) / (b.duration_days || 1)) * 100))
+            }));
+
+        return {
+            enrollmentTrend: getChronologicalData(filteredEnrollmentsForChart, 'enrolled_at', undefined, false),
+            // Only use local daily grouping for week/month/year/custom
+            revenueTrend: getChronologicalData(filteredPaymentsForChart, 'created_at', 'amount', false),
+            activeProgress: activeProgress.length > 0 ? activeProgress : [],
+            courseDistribution: batches.map(b => ({ name: b.name, value: b.enrolled_count || 0 })).filter(b => b.value > 0)
+        };
+    }, [stats, enrollments, payments, batches, dateRange, chartCourseFilter, chartBatchFilter, customStartDate, customEndDate]);
 
     // Form states
     const [courseForm, setCourseForm] = useState({ name: "", description: "" });
@@ -217,7 +372,7 @@ export const useAdminData = () => {
         price: 0,
         ...getLocalDatetime()
     });
-    const [instForm, setInstForm] = useState({ name: "", email: "", password: "" });
+    const [instForm, setInstForm] = useState({ name: "", email: "", password: "", phone: "" });
     const [formLoading, setFormLoading] = useState(false);
 
     // Helpers
@@ -234,11 +389,15 @@ export const useAdminData = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setStats(res.data);
-        } catch (err: any) {
+        } catch (err) {
             if (axios.isCancel(err)) return;
-            console.error("Failed to fetch admin stats:", err?.message || err);
-            if (err.response?.status === 403 || err.response?.status === 401) {
-                handleLogout();
+            console.error("Failed to fetch admin stats:", err);
+            if (axios.isAxiosError(err)) {
+                if (err.response?.status === 403 || err.response?.status === 401) {
+                    handleLogout();
+                } else {
+                    showToast("Failed to sync structural data", "error");
+                }
             } else {
                 showToast("Failed to sync structural data", "error");
             }
@@ -262,11 +421,21 @@ export const useAdminData = () => {
             if (!token) return router.push("/login");
 
             setTabLoading(true);
-            if (tab === 'overview') {
-                const res = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin`, { headers: { Authorization: `Bearer ${token}` } });
-                setStats(res.data);
+            if (tab === 'dashboard') {
+                const timestamp = Date.now();
+                const statsRes = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                const enrollRes = await axios.get(`${API_ENDPOINTS.ENROLLMENTS}?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                const payRes = await axios.get(`${API_ENDPOINTS.PAYMENTS}?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                const courseRes = await axios.get(`${API_ENDPOINTS.COURSES}?all=true&t=${timestamp}`);
+                const batchRes = await axios.get(`${API_ENDPOINTS.BATCHS}?all=true&t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                
+                setStats(statsRes.data);
+                setEnrollments(enrollRes.data);
+                setPayments(payRes.data);
+                setCourses(courseRes.data);
+                setBatches(batchRes.data);
             } else if (tab === 'courses') {
-                const res = await axios.get(`${API_ENDPOINTS.COURSES}?all=true`);
+                const res = await axios.get(`${API_ENDPOINTS.COURSES}?all=true&t=${Date.now()}`);
                 setCourses(res.data);
             } else if (tab === 'instructors') {
                 const res = await axios.get(API_ENDPOINTS.INSTRUCTORS, { headers: { Authorization: `Bearer ${token}` } });
@@ -275,29 +444,28 @@ export const useAdminData = () => {
                 const res = await axios.get(`${API_ENDPOINTS.STUDENTS}`, { headers: { Authorization: `Bearer ${token}` } });
                 setStudents(res.data);
             } else if (tab === 'batches') {
-                const res = await axios.get(`${API_ENDPOINTS.BATCHS}?all=true`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_ENDPOINTS.BATCHS}?all=true&t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
                 setBatches(res.data);
             } else if (tab === 'payments') {
-                const res = await axios.get(API_ENDPOINTS.PAYMENTS, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_ENDPOINTS.PAYMENTS}?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
                 setPayments(res.data);
             } else if (tab === 'inquiries') {
-                const res = await axios.get(API_ENDPOINTS.INQUIRIES, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_ENDPOINTS.INQUIRIES}?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
                 setInquiries(res.data);
             } else if (tab === 'emails') {
-                const res = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin/emails`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin/emails?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
                 setEmailLogs(res.data);
             } else if (tab === 'attendance') {
-                const [cRes, bRes] = await Promise.all([
-                    axios.get(`${API_ENDPOINTS.COURSES}?all=true`),
-                    axios.get(`${API_ENDPOINTS.BATCHS}?all=true`, { headers: { Authorization: `Bearer ${token}` } })
-                ]);
+                const timestamp = Date.now();
+                const cRes = await axios.get(`${API_ENDPOINTS.COURSES}?all=true&t=${timestamp}`);
+                const bRes = await axios.get(`${API_ENDPOINTS.BATCHS}?all=true&t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                
                 setCourses(cRes.data);
                 setBatches(bRes.data);
             } else if (tab === 'settings') {
-                const [dashRes, setRes] = await Promise.all([
-                    axios.get(`${API_ENDPOINTS.DASHBOARD}/admin`, { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get(API_ENDPOINTS.SETTINGS, { headers: { Authorization: `Bearer ${token}` } })
-                ]);
+                const timestamp = Date.now();
+                const dashRes = await axios.get(`${API_ENDPOINTS.DASHBOARD}/admin?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
+                const setRes = await axios.get(`${API_ENDPOINTS.SETTINGS}?t=${timestamp}`, { headers: { Authorization: `Bearer ${token}` } });
 
                 if (dashRes.data.user) {
                     setProfileForm({
@@ -369,10 +537,10 @@ export const useAdminData = () => {
     };
 
     const handleLogout = () => {
-        const itemsToRemove = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
-        itemsToRemove.forEach(item => localStorage.removeItem(item));
+        const keys = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
+        keys.forEach(k => localStorage.removeItem(k));
         sessionStorage.clear();
-        router.replace('/login');
+        window.location.href = "/login";
     };
 
     // Life cycles
@@ -420,6 +588,14 @@ export const useAdminData = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSettingsMessage({ type: "success", text: "Profile updated successfully!" });
+            
+            // Sync localStorage user info
+            const storedUser = localStorage.getItem("snagup_user");
+            if (storedUser) {
+                const userData = JSON.parse(storedUser);
+                localStorage.setItem("snagup_user", JSON.stringify({ ...userData, ...profileForm }));
+            }
+            
             loadData('settings');
         } catch (err: any) {
             setSettingsMessage({ type: "error", text: err.response?.data?.error || "Failed to update profile" });
@@ -491,7 +667,7 @@ export const useAdminData = () => {
             const token = localStorage.getItem("snagup_token");
             await axios.post(API_ENDPOINTS.INSTRUCTORS, instForm, { headers: { Authorization: `Bearer ${token}` } });
             setShowInstructorModal(false);
-            setInstForm({ name: "", email: "", password: "" });
+            setInstForm({ name: "", email: "", password: "", phone: "" });
             loadData('instructors');
             showToast("Instructor created", "success");
         } catch (err: any) {
@@ -567,7 +743,12 @@ export const useAdminData = () => {
     };
 
     const handleArchiveBatch = async (batchId: number) => {
-        if (!confirm("Archive batch & generate certificates?")) return;
+        const batch = batches.find(b => b.id === batchId);
+        if (batch && !batch.instructor_verified) {
+            if (!confirm("Warning: Instructor has not yet verified attendance records.\n\nAre you sure you want to archive and issue certificates anyway?")) return;
+        } else {
+            if (!confirm("Archive batch & generate certificates?")) return;
+        }
         try {
             const token = localStorage.getItem("snagup_token");
             await axios.post(`${API_ENDPOINTS.BATCHS}/${batchId}/archive`, {}, { headers: { Authorization: `Bearer ${token}` } });
@@ -579,15 +760,58 @@ export const useAdminData = () => {
     };
 
     const handleEnrollmentAction = async (id: number, status: 'approved' | 'rejected', category: 'full' | 'invalid' = 'full', feedback: string = '', paid_amount: number = 0) => {
+        if (status === 'rejected' && !rejectionModal.show) {
+            setRejectionModal({ show: true, targetIds: [id], reason: "", isBulk: false });
+            return;
+        }
+
         try {
             const token = localStorage.getItem("snagup_token");
-            await axios.put(`${API_ENDPOINTS.ENROLLMENTS}/${id}/status`, { status, category, feedback, paid_amount }, {
+            await axios.put(`${API_ENDPOINTS.ENROLLMENTS}/${id}/status`, { status, category, feedback: feedback || rejectionModal.reason, paid_amount }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            loadData('payments');
+            
+            // Immediate Local State Update for "Deep Triage" and "Payments Tab"
+            setEnrollments(prev => prev.filter(e => e.id !== id));
+            setPayments(prev => prev.map(p => p.enrollment_id === id ? { ...p, enrollment_status: status, admin_feedback: feedback || rejectionModal.reason } : p));
+            
+            setRejectionModal({ show: false, targetIds: [], reason: "", isBulk: false });
             showToast(`Action: ${status}`, "success");
         } catch (err: any) {
             showToast("Action failed", "error");
+        }
+    };
+
+    const handleBulkEnrollmentAction = async (status: 'approved' | 'rejected', feedback: string = '') => {
+        if (selectedPayments.length === 0) return;
+        
+        if (status === 'rejected' && !rejectionModal.show) {
+            setRejectionModal({ show: true, targetIds: selectedPayments, reason: "", isBulk: true });
+            return;
+        }
+
+        setBulkLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.ENROLLMENTS}/bulk-status`, { 
+                ids: selectedPayments, 
+                status, 
+                feedback: feedback || rejectionModal.reason 
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Update local state for all processed items
+            setEnrollments(prev => prev.filter(e => !selectedPayments.includes(e.id)));
+            setPayments(prev => prev.map(p => selectedPayments.includes(p.enrollment_id) ? { ...p, enrollment_status: status, admin_feedback: feedback || rejectionModal.reason } : p));
+            
+            setSelectedPayments([]);
+            setRejectionModal({ show: false, targetIds: [], reason: "", isBulk: false });
+            showToast(`Bulk ${status} successful`, "success");
+        } catch (err: any) {
+            showToast("Bulk action failed", "error");
+        } finally {
+            setBulkLoading(false);
         }
     };
 
@@ -839,9 +1063,86 @@ export const useAdminData = () => {
         reader.readAsDataURL(file);
     };
 
+    const handleExport = (type: 'students' | 'payments' | 'attendance' | 'certificates' | 'financials' | 'dashboard_graph') => {
+        try {
+            let data: any[] = [];
+            let filename = `Snagup_${type}_Report_${new Date().toISOString().split('T')[0]}`;
+            let sheetName = type.charAt(0).toUpperCase() + type.slice(1);
+
+            switch (type) {
+                case 'students':
+                    data = formatStudentExport(filteredStudents);
+                    break;
+                case 'payments':
+                    data = formatPaymentExport(filteredPayments);
+                    break;
+                case 'certificates':
+                    data = formatCertificateExport(filteredCertificates);
+                    break;
+                case 'attendance':
+                    if (!attendanceData) {
+                        return setToast({ message: "No attendance data loaded for export", type: 'error' });
+                    }
+                    data = formatAttendanceExport(attendanceData);
+                    filename += `_${attBatchId}`;
+                    break;
+                case 'financials':
+                case 'dashboard_graph':
+                    const now = new Date();
+                    let startDate = new Date();
+                    let endDate = new Date();
+                    startDate.setHours(0, 0, 0, 0);
+                    
+                    if (dateRange === 'custom') {
+                        startDate = new Date(customStartDate);
+                        endDate = new Date(customEndDate);
+                    } else {
+                        if (dateRange === 'week') startDate.setDate(now.getDate() - 6);
+                        else if (dateRange === 'month') startDate.setMonth(now.getMonth() - 1);
+                        else if (dateRange === 'year') startDate.setFullYear(now.getFullYear() - 1);
+                        else startDate = new Date(0);
+                    }
+
+                    if (type === 'financials') {
+                        const filteredPaymentsForExport = payments.filter(p => {
+                            const payDate = new Date(p.created_at);
+                            const matchDate = payDate >= startDate && payDate <= endDate;
+                            const matchCourse = chartCourseFilter === 'all' || p.course_id?.toString() === chartCourseFilter;
+                            const matchBatch = chartBatchFilter === 'all' || p.batch_id?.toString() === chartBatchFilter;
+                            return matchDate && matchCourse && matchBatch;
+                        });
+                        data = formatPaymentExport(filteredPaymentsForExport);
+                        filename = `Snagup_Financial_Report_${new Date().toISOString().split('T')[0]}`;
+                        sheetName = "Financial Audit Dataset";
+                    } else {
+                        const filteredForGraph = enrollments.filter(e => {
+                            const enrollDate = new Date(e.enrolled_at);
+                            const matchDate = enrollDate >= startDate && enrollDate <= endDate;
+                            const matchCourse = chartCourseFilter === 'all' || e.course_id.toString() === chartCourseFilter;
+                            const matchBatch = chartBatchFilter === 'all' || e.batch_id.toString() === chartBatchFilter;
+                            return matchDate && matchCourse && matchBatch;
+                        });
+                        data = formatFilteredEnrollmentExport(filteredForGraph);
+                        filename = `Snagup_Filtered_Enrollments_${new Date().toISOString().split('T')[0]}`;
+                        sheetName = "Filtered Student List";
+                    }
+                    break;
+            }
+
+            if (data.length === 0) {
+                return setToast({ message: `No data found for ${type} report`, type: 'info' });
+            }
+
+            exportToExcel(data, filename, sheetName);
+            setToast({ message: `${sheetName} report exported successfully!`, type: 'success' });
+        } catch (err) {
+            setToast({ message: "Export failed. Please try again.", type: 'error' });
+        }
+    };
+
     return {
         // State
-        stats, loading, toast, activeTab, setActiveTab,
+        stats, loading, toast, activeTab, setActiveTab, dashboardSubTab, setDashboardSubTab,
         paymentTab, setPaymentTab, isMobileMenuOpen, setIsMobileMenuOpen,
         tabLoading, publicSettings, inquiries, courses, instructors,
         batches, enrollments, approvedEnrollments, payments, students,
@@ -861,8 +1162,13 @@ export const useAdminData = () => {
         upiSaving, generalSettings, setGeneralSettings, genSaving, notifSettings, setNotifSettings,
         notifSaving, upiMessage, setUpiMessage, settingsLoading, settingsMessage, setSettingsMessage,
         settingsActiveTab, setSettingsActiveTab, showPasswords, setShowPasswords, showInstPassword, setShowInstPassword,
+        selectedPayments, setSelectedPayments, rejectionModal, setRejectionModal,
         courseForm, setCourseForm, batchForm, setBatchForm, instForm, setInstForm, formLoading,
-        certificates, certSearch, setCertSearch, certCourseFilter, setCertCourseFilter,
+        certificates, certSearch, setCertSearch,
+        certCourseFilter, setCertCourseFilter,
+        certBatchFilter, setCertBatchFilter,
+        dateRange, setDateRange, chartCourseFilter, setChartCourseFilter, chartBatchFilter, setChartBatchFilter,
+        customStartDate, setCustomStartDate, customEndDate, setCustomEndDate, chartData,
 
         // Filtered Data
         filteredBatches, filteredPayments, filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, emailLogs,
@@ -872,12 +1178,12 @@ export const useAdminData = () => {
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, handleSaveGeneralSettings,
         handleUpdateDeadline, showToast, fetchAttendanceData,
         handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
-        handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction,
+        handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, handleBulkEnrollmentAction,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings,
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch,
         handleDeleteUser, handleOfficialClose, handleGenerateCert, openEnrollmentsModal,
         openCertModal, preloadDropdowns, handleChangePassword, openEditDeadline,
         handleSelectAllBatches, handleToggleBatchSelection, handleStartBatch, handleLogoUpload,
-        getLocalDatetime, setToast, setAttendanceData, handleDeleteCertificate
+        getLocalDatetime, setToast, setAttendanceData, handleDeleteCertificate, handleExport
     };
 };

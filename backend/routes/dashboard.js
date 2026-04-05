@@ -38,14 +38,21 @@ router.get('/admin', authenticateToken, requireRole('admin'), async (req, res) =
     const [userRows] = await db.execute(`SELECT id, name, email, role, phone FROM users WHERE id = ?`, [req.user.id]);
     const user = userRows[0];
     
-    // Financial Analytics
-    const [allPayments] = await db.execute(`SELECT amount, status, created_at, payment_method, transaction_id, student_id FROM payments`);
+    // Financial Analytics - Using LEFT JOIN to ensure all payments are captured
+    const [allPayments] = await db.execute(`
+        SELECT p.amount, p.status, 
+               DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%sZ') as created_at, 
+               b.course_id, b.id as batch_id 
+        FROM payments p
+        LEFT JOIN enrollments e ON p.enrollment_id = e.id
+        LEFT JOIN batches b ON e.batch_id = b.id
+    `);
     
     const totalRevenue = allPayments.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0);
     const pendingRevenue = allPayments.filter(p => p.status === 'pending' || p.status === 'partial').reduce((sum, p) => sum + Number(p.amount), 0);
     
     const [recentPayments] = await db.execute(`
-       SELECT p.amount, p.status, p.created_at, p.transaction_id, u.name as student_name, c.name as course_name
+       SELECT p.amount, p.status, p.created_at, p.transaction_id, u.name as student_name, u.phone as student_phone, c.name as course_name, b.course_id, b.id as batch_id
        FROM payments p
        JOIN users u ON p.student_id = u.id
        JOIN enrollments e ON p.enrollment_id = e.id
@@ -60,12 +67,79 @@ router.get('/admin', authenticateToken, requireRole('admin'), async (req, res) =
        paymentSuccessRate = Math.round((allPayments.filter(p => p.status === 'completed').length / allPayments.length) * 100);
     }
     
+    const [activeBatchProgress] = await db.execute(`
+      SELECT b.id, b.name, b.duration_days, b.batch_status, b.course_id,
+        (SELECT COUNT(DISTINCT date) FROM attendance WHERE batch_id = b.id) as sessions_completed,
+        c.name as course_name
+      FROM batches b
+      JOIN courses c ON b.course_id = c.id
+      WHERE b.batch_status IN ('active', 'upcoming')
+    `);
+    
+    // Aggregate Trends for the last 12 months
+    let revenueTrendTrend = [];
+    
+    // 1. Determine a safe START date for the 12-month period
+    let start = new Date();
+    start.setMonth(start.getMonth() - 11);
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+
+    // If we have payments, we can optionally start from the earliest record if it's older than 12m
+    if (allPayments.length > 0) {
+        const validDates = allPayments
+            .map(p => new Date(p.created_at))
+            .filter(d => !isNaN(d.getTime()));
+            
+        if (validDates.length > 0) {
+            // Safer way to find min without spread operator to avoid stack overflow
+            const minTime = validDates.reduce((min, d) => Math.min(min, d.getTime()), validDates[0].getTime());
+            const minRecordDate = new Date(minTime);
+            minRecordDate.setDate(1);
+            minRecordDate.setHours(0, 0, 0, 0);
+            // Use the earlier of (12m ago) or (First payment)
+            if (minRecordDate < start) {
+                start = minRecordDate;
+            }
+        }
+    }
+
+    // 2. Generate Buckets and Aggregate
+    const current = new Date(start);
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 1); // Buffer for current month
+
+    while (current <= maxDate) {
+        const monthKey = current.toISOString().slice(0, 7);
+        const value = allPayments
+            .filter(p => {
+                if (p.status !== 'completed' || !p.created_at) return false;
+                const d = new Date(p.created_at);
+                if (isNaN(d.getTime())) return false;
+                return d.toISOString().slice(0, 7) === monthKey;
+            })
+            .reduce((sum, p) => sum + Number(p.amount), 0);
+        
+        revenueTrendTrend.push({
+            name: current.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+            key: monthKey,
+            value: Number(value.toFixed(2))
+        });
+        
+        current.setMonth(current.getMonth() + 1);
+        // Safety break to prevent infinite loops if current doesn't advance
+        if (revenueTrendTrend.length > 60) break; 
+    }
+
     res.json({ 
         totalCourses, totalInstructors, totalStudents, activeBatches, completedBatches, certsIssued, pendingEnrollments, recentBatches, user,
-        financials: { totalRevenue, pendingRevenue, paymentSuccessRate, recentPayments }
+        activeBatchProgress,
+        financials: { totalRevenue, pendingRevenue, paymentSuccessRate, recentPayments, allPayments, revenueTrend: revenueTrendTrend }
     });
   } catch (err) {
     console.error("Admin dashboard error:", err);
+    // Log to a file we can read
+    require('fs').appendFileSync('dashboard_error.log', `[${new Date().toISOString()}] Admin dashboard error: ${err.stack}\n`);
     res.status(500).json({ error: 'Failed to fetch admin stats' });
   }
 });
@@ -130,7 +204,7 @@ router.get('/student', authenticateToken, requireRole('student'), async (req, re
     const nowISTDate = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
 
     const [enrollments] = await db.execute(`
-      SELECT e.*, b.name as batch_name, b.duration_days, b.price, b.batch_status, b.session_link, b.session_time, b.material_link, b.material_message, b.broadcast_message, b.broadcast_updated_at, b.archived_at, b.verification_deadline,
+      SELECT e.*, b.name as batch_name, b.duration_days, b.price, b.batch_status, b.session_link, b.session_time, b.material_link, b.material_message, b.broadcast_message, b.broadcast_updated_at, b.archived_at, b.verification_deadline, b.attendance_completed, b.instructor_verified,
         c.name as course_name, c.category,
         u.name as instructor_name,
         (SELECT SUM(amount) FROM payments WHERE enrollment_id = e.id AND status = 'completed') as paid_amount,

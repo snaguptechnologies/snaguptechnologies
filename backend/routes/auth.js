@@ -29,10 +29,10 @@ router.post('/forgot-password', async (req, res) => {
 
         // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        // Calculate expiration 10 mins from now in MySQL format
+        // Calculate expiration 10 mins from now using local server time (avoids UTC/IST mismatch with MySQL DATETIME)
         const expiresDate = new Date(Date.now() + 10 * 60 * 1000);
-        // Format to YYYY-MM-DD HH:MM:SS
-        const expires = expiresDate.toISOString().slice(0, 19).replace('T', ' ');
+        const pad = (n) => String(n).padStart(2, '0');
+        const expires = `${expiresDate.getFullYear()}-${pad(expiresDate.getMonth() + 1)}-${pad(expiresDate.getDate())} ${pad(expiresDate.getHours())}:${pad(expiresDate.getMinutes())}:${pad(expiresDate.getSeconds())}`;
 
         await db.execute(`UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE id = ?`, [otp, expires, user.id]);
 
@@ -77,8 +77,9 @@ router.post('/verify-otp', async (req, res) => {
             return res.status(401).json({ error: 'Invalid OTP' });
         }
 
-        if (new Date() > new Date(user.reset_otp_expires)) {
-            return res.status(401).json({ error: 'OTP has expired' });
+        // Compare local time against what was stored (both in local time)
+        if (Date.now() > new Date(user.reset_otp_expires).getTime()) {
+            return res.status(401).json({ error: 'OTP has expired. Please request a new one.' });
         }
 
         res.json({ success: true, message: 'OTP verified successfully' });
@@ -101,8 +102,8 @@ router.post('/reset-password', async (req, res) => {
             return res.status(401).json({ error: 'Invalid or expired session' });
         }
 
-        if (new Date() > new Date(user.reset_otp_expires)) {
-            return res.status(401).json({ error: 'Session expired' });
+        if (Date.now() > new Date(user.reset_otp_expires).getTime()) {
+            return res.status(401).json({ error: 'Session expired. Please request a new OTP.' });
         }
 
         const hash = bcrypt.hashSync(newPassword, 10);
@@ -120,23 +121,32 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
+    console.log(`[Auth] Attempting login for: ${email}`);
     try {
         const [rows] = await db.execute(`SELECT * FROM users WHERE email = ? AND is_active = 1`, [email.toLowerCase().trim()]);
         const user = rows[0];
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        
+        if (!user) {
+            console.warn(`[Auth] Login failed: User not found for ${email}`);
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
         const valid = bcrypt.compareSync(password, user.password_hash);
-        if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!valid) {
+            console.warn(`[Auth] Login failed: Password mismatch for ${email}`);
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
         const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+        console.log(`[Auth] Login success: ${email} (${user.role})`);
 
         res.json({
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone }
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Login failed' });
+        console.error("❌ [Auth] Fatal Login Error:", err);
+        res.status(500).json({ error: 'Login failed due to server error' });
     }
 });
 

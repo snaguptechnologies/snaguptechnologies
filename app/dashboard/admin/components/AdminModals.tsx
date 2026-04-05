@@ -82,14 +82,15 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
 
     return (
         <>
-            {/* New Program Modal */}
             {showCourseModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowCourseModal(false)}>
-                    <div className="admin-card p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowCourseModal(false)} className="absolute top-8 right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">New Program</h2>
-                        <p className="text-[10px] text-muted-foreground mb-8 tracking-widest uppercase font-bold opacity-60">Architectural Deployment</p>
-                        <form onSubmit={handleCreateCourse} className="space-y-6">
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowCourseModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">New Program</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Architectural Deployment</p>
+                        </div>
+                        <form onSubmit={handleCreateCourse} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
                             <div>
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Title</label>
                                 <input required value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="e.g. FULLSTACK NEURAL ENG" />
@@ -98,7 +99,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Descriptor</label>
                                 <textarea value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all min-h-[140px] font-bold placeholder:text-muted-foreground/30" placeholder="Define program objectives..." />
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em]">
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> AUTHORIZE DEPLOYMENT</>}
                             </button>
                         </form>
@@ -106,14 +107,15 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                 </div>
             )}
 
-            {/* Instructor Modal */}
             {showInstructorModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowInstructorModal(false)}>
-                    <div className="admin-card p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowInstructorModal(false)} className="absolute top-8 right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Facilitator</h2>
-                        <p className="text-[10px] text-muted-foreground mb-8 tracking-widest uppercase font-bold opacity-60">Access Provisioning</p>
-                        <form onSubmit={handleCreateInstructor} className="space-y-6">
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowInstructorModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Facilitator</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Access Provisioning</p>
+                        </div>
+                        <form onSubmit={handleCreateInstructor} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
                             <div>
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Legal Identity</label>
                                 <input required value={instForm.name} onChange={e => setInstForm({ ...instForm, name: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="Full name of specialist" />
@@ -121,6 +123,16 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                             <div>
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Node Email</label>
                                 <input type="email" required value={instForm.email} onChange={e => setInstForm({ ...instForm, email: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="facilitator@snagup.tech" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Mobile Protocol</label>
+                                <input 
+                                    type="text"
+                                    value={instForm.phone} 
+                                    onChange={e => setInstForm({ ...instForm, phone: e.target.value })} 
+                                    className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" 
+                                    placeholder="+91 00000 00000" 
+                                />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Access Credential</label>
@@ -143,7 +155,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                     </button>
                                 </div>
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black transition-all shadow-2xl shadow-foreground/10 flex items-center justify-center gap-3 text-xs tracking-[0.2em]">
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black transition-all shadow-2xl shadow-foreground/10 flex items-center justify-center gap-3 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><Users className="w-5 h-5" /> VERIFY & ENROLL</>}
                             </button>
                         </form>
@@ -151,16 +163,17 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                 </div>
             )}
 
-            {/* Batch Modal */}
             {showBatchModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowBatchModal(false)}>
-                    <div className="admin-card p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card" onClick={e => e.stopPropagation()}>
-                        <button type="button" onClick={() => setShowBatchModal(false)} className="absolute top-8 right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Batch Unit</h2>
-                        <p className="text-[10px] text-muted-foreground mb-8 tracking-widest uppercase font-bold opacity-60">Synchronized Unit Deployment</p>
-                        <form onSubmit={handleCreateBatch} className="space-y-6">
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button type="button" onClick={() => setShowBatchModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Batch Unit</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Synchronized Unit Deployment</p>
+                        </div>
+                        <form onSubmit={handleCreateBatch} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Architecture</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Program Architecture</label>
                                 <select
                                     required
                                     value={batchForm.course_id}
@@ -186,7 +199,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Batch Identifier (Name)</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Batch Identifier (Name)</label>
                                 <input
                                     type="text"
                                     required
@@ -197,14 +210,14 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Facilitator Assignment</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Facilitator Assignment</label>
                                 <select required value={batchForm.instructor_id} onChange={e => setBatchForm({ ...batchForm, instructor_id: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold appearance-none cursor-pointer">
                                     <option value="" disabled className="bg-background">Select Facilitator...</option>
                                     {instructors.map(i => <option key={i.id} value={i.id} className="bg-background">{i.name}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Enrollment Deadline*</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Enrollment Deadline*</label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input
                                         type="date"
@@ -224,15 +237,15 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Valuation (₹)</label>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Valuation (₹)</label>
                                     <input type="number" required value={batchForm.price || ""} onChange={e => setBatchForm({ ...batchForm, price: e.target.value ? parseInt(e.target.value) : 0 })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Duration (Days)</label>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Duration (Days)</label>
                                     <input type="number" required value={batchForm.duration_days || ""} onChange={e => setBatchForm({ ...batchForm, duration_days: e.target.value ? parseInt(e.target.value) : 0 })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold" />
                                 </div>
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em]">
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><Clock className="w-5 h-5" /> SYNCHRONIZE BATCH</>}
                             </button>
                         </form>
@@ -240,16 +253,17 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                 </div>
             )}
 
-            {/* Edit Batch Modal */}
             {showEditBatchModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditBatchModal(false)}>
-                    <div className="admin-card p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card" onClick={e => e.stopPropagation()}>
-                        <button type="button" onClick={() => setShowEditBatchModal(false)} className="absolute top-8 right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Edit Batch</h2>
-                        <p className="text-[10px] text-muted-foreground mb-8 tracking-widest uppercase font-bold opacity-60">Update Configuration</p>
-                        <form onSubmit={handleEditBatchSubmit} className="space-y-6">
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button type="button" onClick={() => setShowEditBatchModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Edit Batch</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Update Configuration</p>
+                        </div>
+                        <form onSubmit={handleEditBatchSubmit} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Architecture</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Program Architecture</label>
                                 <select
                                     required
                                     value={editBatchForm.course_id}
@@ -261,7 +275,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Batch Identifier (Name)</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Batch Identifier (Name)</label>
                                 <input
                                     type="text"
                                     required
@@ -271,7 +285,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Facilitator Assignment</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Facilitator Assignment</label>
                                 <select required value={editBatchForm.instructor_id} onChange={e => setEditBatchForm({ ...editBatchForm, instructor_id: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold appearance-none cursor-pointer">
                                     <option value="" disabled className="bg-background">Select Facilitator...</option>
                                     {instructors.map(i => <option key={i.id} value={i.id} className="bg-background">{i.name}</option>)}
@@ -279,15 +293,15 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Valuation (₹)</label>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Valuation (₹)</label>
                                     <input type="number" required value={editBatchForm.price === 0 ? "" : editBatchForm.price} onChange={e => setEditBatchForm({ ...editBatchForm, price: e.target.value ? parseInt(e.target.value) : 0 })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold" />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Duration (Days)</label>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Duration (Days)</label>
                                     <input type="number" required value={editBatchForm.duration_days === 0 ? "" : editBatchForm.duration_days} onChange={e => setEditBatchForm({ ...editBatchForm, duration_days: e.target.value ? parseInt(e.target.value) : 0 })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold" />
                                 </div>
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em]">
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><FileText className="w-5 h-5" /> SAVE CHANGES</>}
                             </button>
                         </form>
@@ -437,16 +451,17 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                 </div>
             )}
 
-            {/* Edit Deadline Modal */}
             {showEditDeadlineModal && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditDeadlineModal(false)}>
-                    <div className="admin-card p-10 w-full max-w-md relative shadow-2xl border-primary/20 bg-card" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowEditDeadlineModal(false)} className="absolute top-8 right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Shift Deadline</h2>
-                        <p className="text-[10px] text-muted-foreground mb-8 tracking-widest uppercase font-bold opacity-60">
-                            {selectedBatchForDeadline?.name} • {selectedBatchForDeadline?.course_name}
-                        </p>
-                        <form onSubmit={handleUpdateDeadline} className="space-y-6">
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-primary/20 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowEditDeadlineModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Shift Deadline</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">
+                                {selectedBatchForDeadline?.name} • {selectedBatchForDeadline?.course_name}
+                            </p>
+                        </div>
+                        <form onSubmit={handleUpdateDeadline} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block opacity-70">New Enrollment Deadline*</label>
                                 <div className="grid grid-cols-2 gap-3">
@@ -477,7 +492,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                     Note: Extending the deadline will automatically make the batch visible to students again if it was previously hidden.
                                 </p>
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em]">
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> AUTHORIZE UPDATE</>}
                             </button>
                         </form>

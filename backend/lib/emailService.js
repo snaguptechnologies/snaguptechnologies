@@ -591,6 +591,38 @@ const notifyGuidelines = async (students, batchName, guidelines) => {
     }
 };
 
+const notifyAdminOfVerification = async (batchName, instructorName, courseName) => {
+    const subject = `Batch Ready for Archive: ${batchName}`;
+    const siteUrl = await getSiteUrl();
+
+    const htmlTemplate = `
+        <div style="font-family: 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 2px solid #000000; background-color: #ffffff; color: #000000;">
+            <div style="background-color: #000000; color: #ffffff; padding: 30px; margin-bottom: 30px;">
+                <h2 style="font-size: 20px; font-weight: 900; margin: 0; text-transform: uppercase;">Batch Verified by Instructor</h2>
+                <p style="font-size: 14px; line-height: 1.6; margin: 10px 0 0 0;">The facilitator has verified the attendance records and submitted the batch for final archiving.</p>
+            </div>
+            <div style="border: 2px solid #000000; padding: 25px; margin-bottom: 30px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr><td style="padding: 5px 0; font-weight: 700; width: 120px;">Course:</td><td>${courseName}</td></tr>
+                    <tr><td style="padding: 5px 0; font-weight: 700;">Batch:</td><td>${batchName}</td></tr>
+                    <tr><td style="padding: 5px 0; font-weight: 700;">Instructor:</td><td>${instructorName}</td></tr>
+                </table>
+            </div>
+            <a href="${siteUrl}/dashboard/admin" style="display: block; background-color: #10b981; color: #ffffff; text-align: center; padding: 20px; font-weight: 900; text-decoration: none; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em;">REVIEW & ARCHIVE</a>
+        </div>
+    `;
+
+    const plainBody = `Batch Ready for Archive: ${batchName}\nCourse: ${courseName}\nInstructor: ${instructorName}\n\nReview and publish at: ${siteUrl}/dashboard/admin`;
+
+    await sendEmail({
+        to: 'admin@snagup.com',
+        subject,
+        body: plainBody,
+        html: htmlTemplate,
+        purpose: 'Admin Archive Notification'
+    });
+};
+
 module.exports = {
     sendEmail,
     formatTimeAMPM,
@@ -604,5 +636,6 @@ module.exports = {
     notifyEnrollmentOpened,
     notifyEnrollmentRejected,
     notifyGuidelines,
-    notifyEnrollmentReceived
+    notifyEnrollmentReceived,
+    notifyAdminOfVerification
 };

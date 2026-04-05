@@ -68,7 +68,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
     const getTabLabel = (id: string) => {
         const labels: Record<string, string> = {
-            'overview': 'Dashboard Overview',
+            'dashboard': 'System Dashboard',
             'courses': 'Course Matrix',
             'instructors': 'Faculty Roster',
             'students': 'Student Database',
@@ -480,6 +480,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                             <p className="text-xs text-muted-foreground">Change your account password to keep it secure</p>
                                         </div>
                                     </div>
+
+                                    {settingsMessage.text && (
+                                        <div className={`mb-8 p-5 rounded-2xl border flex items-center gap-4 text-[11px] font-black uppercase tracking-widest animate-scale-in ${settingsMessage.type === 'success' ? 'bg-foreground/5 border-foreground/20 text-foreground' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}`}>
+                                            {settingsMessage.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <X className="w-5 h-5" />}
+                                            {settingsMessage.text}
+                                        </div>
+                                    )}
 
                                     <form onSubmit={handleChangePassword} className="space-y-6">
                                         <div className="grid grid-cols-1 gap-6">

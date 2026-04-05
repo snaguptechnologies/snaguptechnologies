@@ -14,7 +14,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAdminData } from './hooks/useAdminData';
 
 // Sub-components
-import OverviewTab from './components/OverviewTab';
+import DashboardTab from './components/DashboardTab';
 import CoursesTab from './components/CoursesTab';
 import InstructorsTab from './components/InstructorsTab';
 import StudentsTab from './components/StudentsTab';
@@ -26,11 +26,12 @@ import SettingsTab from './components/SettingsTab';
 import EmailsTab from './components/EmailsTab';
 import CertificatesTab from './components/CertificatesTab';
 import AdminModals from './components/AdminModals';
+import RejectionModal from './components/modals/RejectionModal';
 
 export default function AdminDashboard() {
     const adminProps = useAdminData();
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
-    const [previousTab, setPreviousTab] = useState<string>('overview');
+    const [previousTab, setPreviousTab] = useState<string>('dashboard');
     const { 
         loading, stats, toast, activeTab, setActiveTab, 
         paymentTab, setPaymentTab, isMobileMenuOpen, setIsMobileMenuOpen, 
@@ -54,16 +55,22 @@ export default function AdminDashboard() {
         setShowInstPassword, courseForm, setCourseForm, batchForm, setBatchForm, 
         instForm, setInstForm, formLoading, filteredBatches, filteredPayments, 
         filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, 
+        selectedPayments, setSelectedPayments, rejectionModal, setRejectionModal,
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, 
         handleSaveGeneralSettings, handleUpdateDeadline, showToast, fetchAttendanceData, 
         handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, 
+        handleBulkEnrollmentAction,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings, 
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch, handleDeleteUser, 
         handleOfficialClose, handleGenerateCert, openEnrollmentsModal, openCertModal, 
         preloadDropdowns, handleChangePassword, openEditDeadline, handleSelectAllBatches, 
         handleToggleBatchSelection, handleStartBatch, handleLogoUpload, getLocalDatetime, setToast, setAttendanceData, emailLogs,
-        certificates, certSearch, setCertSearch, certCourseFilter, setCertCourseFilter, filteredCertificates, handleDeleteCertificate
+        certificates, certSearch, setCertSearch, certCourseFilter, setCertCourseFilter, certBatchFilter, setCertBatchFilter, filteredCertificates, handleDeleteCertificate,
+        dashboardSubTab, setDashboardSubTab, handleExport,
+        dateRange, setDateRange, chartCourseFilter, setChartCourseFilter, 
+        chartBatchFilter, setChartBatchFilter, chartData,
+        customStartDate, setCustomStartDate, customEndDate, setCustomEndDate
     } = adminProps;
 
     if (loading) {
@@ -75,7 +82,7 @@ export default function AdminDashboard() {
     }
 
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Layers className="w-4 h-4" /> },
+        { id: 'dashboard', label: 'Dashboard', icon: <Layers className="w-4 h-4" /> },
         { id: 'courses', label: 'Courses', icon: <BookOpen className="w-4 h-4" /> },
         { id: 'instructors', label: 'Instructors', icon: <GraduationCap className="w-4 h-4" /> },
         { id: 'batches', label: 'Batches', icon: <Clock className="w-4 h-4" /> },
@@ -105,7 +112,7 @@ export default function AdminDashboard() {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="space-y-2 overflow-y-auto custom-scrollbar">
                             {tabs.map(tab => (
                                 <button
                                     key={tab.id}
@@ -115,7 +122,7 @@ export default function AdminDashboard() {
                                         : "text-muted-foreground bg-muted/30 border-border/50 hover:bg-muted"
                                         }`}
                                 >
-                                    {tab.id === 'overview' ? <Globe className="w-5 h-5" /> :
+                                    {tab.id === 'dashboard' ? <Globe className="w-5 h-5" /> :
                                         tab.id === 'batches' ? <Layers className="w-5 h-5" /> :
                                             tab.id === 'courses' ? <BookOpen className="w-5 h-5" /> :
                                                 tab.id === 'instructors' ? <Shield className="w-5 h-5" /> :
@@ -153,7 +160,7 @@ export default function AdminDashboard() {
                         )}
                     </div>
 
-                    <nav className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar py-2">
+                    <nav className="space-y-4 flex-1 overflow-y-auto custom-scrollbar py-2">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
@@ -253,14 +260,36 @@ export default function AdminDashboard() {
                         <div className="fixed bottom-0 left-1/4 w-[800px] h-[600px] bg-foreground/3 rounded-full blur-[160px] pointer-events-none opacity-10 z-0" />
 
                         <div className="relative z-10">
-                            {/* OVERVIEW TAB */}
-                            {activeTab === 'overview' && (
-                                <OverviewTab 
+                            {/* DASHBOARD TAB */}
+                            {activeTab === 'dashboard' && (
+                                <DashboardTab 
                                     stats={stats}
                                     setActiveTab={setActiveTab}
                                     openEnrollmentsModal={openEnrollmentsModal}
                                     openCertModal={openCertModal}
                                     setShowCourseModal={setShowCourseModal}
+                                    dashboardSubTab={dashboardSubTab}
+                                    setDashboardSubTab={setDashboardSubTab}
+                                    handleExport={handleExport}
+                                    dateRange={dateRange}
+                                    setDateRange={setDateRange}
+                                    customStartDate={customStartDate}
+                                    setCustomStartDate={setCustomStartDate}
+                                    customEndDate={customEndDate}
+                                    setCustomEndDate={setCustomEndDate}
+                                    chartCourseFilter={chartCourseFilter}
+                                    setChartCourseFilter={setChartCourseFilter}
+                                    chartBatchFilter={chartBatchFilter}
+                                    setChartBatchFilter={setChartBatchFilter}
+                                    chartData={chartData}
+                                    courses={courses}
+                                    batches={batches}
+                                    enrollments={enrollments}
+                                    handleEnrollmentAction={handleEnrollmentAction}
+                                    handleToggleEnrollment={handleToggleEnrollment}
+                                    handleStartBatch={handleStartBatch}
+                                    handleEndBatch={handleEndBatch}
+                                    handleFinalizeBatch={handleFinalizeBatch}
                                 />
                             )}
 
@@ -343,6 +372,9 @@ export default function AdminDashboard() {
                                     filteredPayments={filteredPayments}
                                     tabLoading={tabLoading}
                                     handleEnrollmentAction={handleEnrollmentAction}
+                                    selectedPayments={selectedPayments}
+                                    setSelectedPayments={setSelectedPayments}
+                                    handleBulkEnrollmentAction={handleBulkEnrollmentAction}
                                 />
                             )}
 
@@ -394,9 +426,12 @@ export default function AdminDashboard() {
                                     setCertSearch={setCertSearch}
                                     certCourseFilter={certCourseFilter}
                                     setCertCourseFilter={setCertCourseFilter}
+                                    certBatchFilter={certBatchFilter}
+                                    setCertBatchFilter={setCertBatchFilter}
                                     tabLoading={tabLoading}
                                     handleDeleteCertificate={handleDeleteCertificate}
                                     courses={courses}
+                                    batches={batches}
                                 />
                             )}
 
@@ -411,6 +446,20 @@ export default function AdminDashboard() {
                             )}
 
                             <AdminModals {...adminProps} />
+                            
+                            <RejectionModal 
+                                show={rejectionModal.show}
+                                onClose={() => setRejectionModal({ ...rejectionModal, show: false })}
+                                onSubmit={(reason) => {
+                                    if (rejectionModal.isBulk) {
+                                        handleBulkEnrollmentAction('rejected', reason);
+                                    } else {
+                                        handleEnrollmentAction(rejectionModal.targetIds[0], 'rejected', 'invalid', reason);
+                                    }
+                                }}
+                                isBulk={rejectionModal.isBulk}
+                                count={rejectionModal.targetIds.length}
+                            />
                         </div>
                     </div>
                 </main>

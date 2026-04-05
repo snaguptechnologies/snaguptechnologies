@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, CreditCard, Landmark, Smartphone, ShieldCheck, ChevronRight, Loader2, CheckCircle2 } from "lucide-react";
 import axios from "axios";
+import { API_ENDPOINTS, BASE_URL } from "@/app/lib/api";
 
 interface PaymentGatewayProps {
     batch: {
@@ -31,7 +32,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({ batch, onSuccess, onClo
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await axios.get("http://localhost:5000/api/settings/public");
+                const res = await axios.get(`${API_ENDPOINTS.SETTINGS}/public`);
                 setUpiSettings({
                     upi_id: res.data.upi_id || "payments@snagup",
                     upi_qr_image: res.data.upi_qr_image || ""
@@ -58,7 +59,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({ batch, onSuccess, onClo
             const token = localStorage.getItem("snagup_token");
             if (!token) throw new Error("Authentication required");
 
-            await axios.post("http://localhost:5000/api/enrollments", {
+            await axios.post(API_ENDPOINTS.ENROLLMENTS, {
                 batch_id: batch.id,
                 payment_method: "upi",
                 transaction_id: utr.trim()

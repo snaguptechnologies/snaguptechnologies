@@ -14,6 +14,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
         });
         res.json(settingsObj);
     } catch (err) {
+        console.error("❌ Failed to fetch admin settings:", err);
         res.status(500).json({ error: 'Failed to fetch settings' });
     }
 });
@@ -29,6 +30,7 @@ router.get('/public', async (req, res) => {
         });
         res.json(settingsObj);
     } catch (err) {
+        console.error("❌ Failed to fetch public settings:", err);
         res.status(500).json({ error: 'Failed to fetch public settings' });
     }
 });

@@ -101,7 +101,15 @@ export default function Login() {
             // Redirect based on role
             router.push(`/dashboard/${res.data.user.role}`);
         } catch (err: any) {
-            setError(err.response?.data?.error || "Failed to login. Please try again.");
+            if (err.response) {
+                // Server responded with an error status
+                setError(err.response.data?.error || "Login failed. Please check your credentials.");
+            } else if (err.request) {
+                // Request was made but no response (server down / network issue)
+                setError("Cannot reach the server. Please ensure the backend is running.");
+            } else {
+                setError("An unexpected error occurred. Please try again.");
+            }
         } finally {
             setLoading(false);
         }

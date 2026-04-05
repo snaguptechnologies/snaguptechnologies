@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import BrandLogo from "./BrandLogo";
 import { usePathname } from "next/navigation";
-import { BookOpen, LogOut, Menu, User, LayoutDashboard, Shield, ArrowRight } from "lucide-react";
+import { BookOpen, LogOut, Menu, User, LayoutDashboard, Shield, ArrowRight, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
@@ -23,17 +23,22 @@ export default function Navbar() {
     }, []);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem("snagup_user");
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (e) {
-                console.error("Failed to parse stored user", e);
+        const checkUser = () => {
+            const storedUser = localStorage.getItem("snagup_user");
+            if (storedUser) {
+                try {
+                    setUser(JSON.parse(storedUser));
+                } catch (e) {
+                    setUser(null);
+                }
+            } else {
                 setUser(null);
             }
-        } else {
-            setUser(null);
-        }
+        };
+
+        checkUser();
+        window.addEventListener("storage", checkUser);
+        return () => window.removeEventListener("storage", checkUser);
     }, [pathname]);
 
     useEffect(() => {
@@ -45,8 +50,9 @@ export default function Navbar() {
     }, [isMobileMenuOpen]);
 
     function handleLogout() {
-        localStorage.removeItem("snagup_token");
-        localStorage.removeItem("snagup_user");
+        const keys = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
+        keys.forEach(k => localStorage.removeItem(k));
+        sessionStorage.clear();
         setUser(null);
         window.location.href = "/login";
     }
@@ -70,26 +76,17 @@ export default function Navbar() {
                 )}
             >
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="text-muted-foreground hover:text-foreground md:hidden p-2 -ml-2 transition-colors"
-                        >
-                            {isMobileMenuOpen ? <LogOut className="w-6 h-6 rotate-90" /> : <Menu className="w-6 h-6" />}
-                        </button>
-                        
-                        <Link href="/home" className="flex items-center gap-3 group">
-                            <BrandLogo size={38} className="transition-transform duration-500 group-hover:rotate-[360deg]" />
-                            <div className="flex flex-col items-start leading-none">
-                                <span className="hidden sm:flex font-black text-2xl tracking-tight text-foreground">
-                                    SNAGUP
-                                </span>
-                                <span className="hidden sm:flex font-bold text-[10px] uppercase tracking-[0.25em] text-primary -mt-0.5 ml-0.5">
-                                    Technologies
-                                </span>
-                            </div>
-                        </Link>
-                    </div>
+                    <Link href="/home" className="flex items-center gap-3 group">
+                        <BrandLogo size={38} className="transition-transform duration-500 group-hover:rotate-[360deg]" />
+                        <div className="flex flex-col items-start leading-none">
+                            <span className="flex font-black text-2xl tracking-tight text-foreground">
+                                SNAGUP
+                            </span>
+                            <span className="flex font-bold text-[10px] uppercase tracking-[0.25em] text-primary -mt-0.5 ml-0.5">
+                                Technologies
+                            </span>
+                        </div>
+                    </Link>
 
                     {/* Desktop Nav */}
                     <nav className="hidden md:flex items-center gap-8">
@@ -107,15 +104,14 @@ export default function Navbar() {
                         ))}
                     </nav>
 
-                    {/* Desktop Actions */}
+                    {/* Right Actions */}
                     <div className="flex items-center gap-4">
-                        <div className="hidden sm:block">
-                            <ThemeToggle />
-                        </div>
                         <div className="hidden md:flex items-center gap-4">
+                            <ThemeToggle />
+                            <div className="w-px h-6 bg-border mx-2" />
                             {user ? (
                                 <Link
-                                    href={`/dashboard/${user.role}`}
+                                    href={`/dashboard/${user.role === 'admin' ? 'admin' : user.role === 'instructor' ? 'instructor' : 'student'}`}
                                     className="px-5 py-2.5 text-xs font-black uppercase tracking-widest text-primary-foreground bg-primary rounded-xl transition-all shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95"
                                 >
                                     Dashboard
@@ -134,18 +130,19 @@ export default function Navbar() {
                                 </>
                             )}
                         </div>
-                        {/* Mobile dashboard/login icon quick link */}
-                        <div className="md:hidden">
-                            {user ? (
-                                <Link href={`/dashboard/${user.role}`} className="p-2 text-primary">
-                                    <LayoutDashboard className="w-6 h-6" />
-                                </Link>
+
+                        {/* Mobile Menu Toggle (Right Side) */}
+                        <button 
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="text-muted-foreground hover:text-foreground md:hidden p-2 transition-colors relative z-[60]"
+                            aria-label="Toggle Menu"
+                        >
+                            {isMobileMenuOpen ? (
+                                <X className="w-6 h-6" />
                             ) : (
-                                <Link href="/login" className="p-2 text-muted-foreground">
-                                    <User className="w-6 h-6" />
-                                </Link>
+                                <Menu className="w-6 h-6" />
                             )}
-                        </div>
+                        </button>
                     </div>
                 </div>
             </header>

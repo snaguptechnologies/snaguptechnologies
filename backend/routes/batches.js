@@ -12,7 +12,21 @@ const { generateCertificateInternal } = require('./certificates');
 
 // Helper: IST-aware current datetime string (YYYY-MM-DD HH:mm:ss)
 function nowIST() {
-  return new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).toISOString().slice(0, 19).replace('T', ' ');
+  const d = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+// Helper: IST-aware today's date string (YYYY-MM-DD)
+function todayIST() {
+  return nowIST().slice(0, 10);
+}
+
+// Helper: IST-aware datetime N hours from now (YYYY-MM-DD HH:mm:ss)
+function futureIST(ms) {
+  const d = new Date(new Date().getTime() + ms + (5.5 * 60 * 60 * 1000));
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
 // Helper: Notify waitlist students when enrollment opens
@@ -217,26 +231,37 @@ router.put('/:id/finalize', authenticateToken, requireRole('admin'), async (req,
   const batchId = req.params.id;
   
   try {
-    const [batchRows] = await db.execute('SELECT name, broadcast_message FROM batches WHERE id = ?', [batchId]);
+    const [batchRows] = await db.execute(`
+      SELECT b.name, b.instructor_id, c.name as course_name 
+      FROM batches b 
+      JOIN courses c ON b.course_id = c.id 
+      WHERE b.id = ?
+    `, [batchId]);
     const batch = batchRows[0];
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-    await db.execute(`UPDATE batches SET is_finalized = 1, enrollment_status = 'closed' WHERE id = ?`, [batchId]);
+    await db.execute(`UPDATE batches SET is_finalized = 1, enrollment_status = 'closed', broadcast_message = NULL WHERE id = ?`, [batchId]);
 
-    const [students] = await db.execute(`
-      SELECT u.email FROM users u
-      JOIN enrollments e ON u.id = e.student_id
-      WHERE e.batch_id = ? AND e.status = 'approved'
-    `, [batchId]);
-
-    if (students.length > 0 && batch.broadcast_message) {
-      const { notifyGuidelines } = require('../lib/emailService');
-      notifyGuidelines(students.map(s => ({ email: s.email })), batch.name, batch.broadcast_message).catch(err => {
-        console.error("Failed to send guidelines email:", err);
-      });
+    // Notify the Instructor that enrollment is finalized and they should start sessions
+    if (batch.instructor_id) {
+      const [instRows] = await db.execute('SELECT name, email FROM users WHERE id = ?', [batch.instructor_id]);
+      if (instRows.length > 0) {
+        const instructor = instRows[0];
+        const { notifyInstructorOfUpdate } = require('../lib/emailService');
+        notifyInstructorOfUpdate(
+          instructor.email, 
+          instructor.name, 
+          batch.course_name, 
+          batch.name, 
+          'Enrollment Finalized', 
+          'Admission for this batch is now permanently closed. You may now proceed to initiate the sessions and share live links with the students.'
+        ).catch(err => {
+          console.error("Failed to notify instructor of finalization:", err);
+        });
+      }
     }
 
-    res.json({ message: 'Admission finalized. Enrollment closed permanently. Guidelines sent to students.' });
+    res.json({ message: 'Admission finalized. Enrollment closed permanently. Instructor has been notified to start sessions.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to finalize admission' });
@@ -247,8 +272,8 @@ router.put('/:id/finalize', authenticateToken, requireRole('admin'), async (req,
 router.put('/:id/end', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const batchId = req.params.id;
-    const endDate = new Date().toISOString().split('T')[0];
-    const verificationDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const endDate = todayIST();
+    const verificationDeadline = futureIST(48 * 60 * 60 * 1000);
 
     await db.execute(`
       UPDATE batches 
@@ -289,7 +314,7 @@ router.put('/:id/end', authenticateToken, requireRole('admin'), async (req, res)
 router.post('/:id/archive', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const batchId = req.params.id;
-    const archivedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const archivedAt = nowIST();
 
     await db.execute(`
       UPDATE batches 
@@ -326,7 +351,7 @@ router.post('/:id/archive', authenticateToken, requireRole('admin'), async (req,
 
 // PUT /api/batches/:id/close - admin only official close (hides for students)
 router.put('/:id/close', authenticateToken, requireRole('admin'), async (req, res) => {
-  const endDate = new Date().toISOString().split('T')[0];
+  const endDate = todayIST();
   try {
     await db.execute(`
       UPDATE batches SET batch_status = 'closed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL WHERE id = ?
@@ -394,7 +419,7 @@ router.put('/:id/session-link', authenticateToken, async (req, res) => {
 
     if (students.length > 0) {
       if (session_link && session_link.trim().length > 0) {
-        notifyStudentsOfSessionLink(students, batch.course_name, batch.name, session_link, `${new Date().toISOString().split('T')[0]} ${session_time}`).catch(err => {
+        notifyStudentsOfSessionLink(students, batch.course_name, batch.name, session_link, `${todayIST()} ${session_time}`).catch(err => {
           console.error("Failed to send session link emails:", err);
         });
       } else {
@@ -564,7 +589,7 @@ router.put('/bulk-update', authenticateToken, requireRole('admin'), async (req, 
 
   try {
     const placeholders = ids.map(() => '?').join(',');
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayIST();
 
     let query = "";
     let params = [];
@@ -587,10 +612,10 @@ router.put('/bulk-update', authenticateToken, requireRole('admin'), async (req, 
       query = `UPDATE batches SET enrollment_status = 'closed' WHERE id IN (${placeholders})`;
       params = ids;
     } else if (action === 'end_batch') {
-      query = `UPDATE batches SET batch_status = 'completed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL WHERE id IN (${placeholders})`;
+      query = `UPDATE batches SET batch_status = 'completed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
       params = [today, ...ids];
     } else if (action === 'official_close') {
-      query = `UPDATE batches SET batch_status = 'closed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL WHERE id IN (${placeholders})`;
+      query = `UPDATE batches SET batch_status = 'closed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
       params = [today, ...ids];
     } else {
       return res.status(400).json({ error: 'Invalid bulk action' });
@@ -658,33 +683,31 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
   const studentId = req.user.id;
 
   try {
-    const [enrollmentRows] = await db.execute('SELECT status FROM enrollments WHERE student_id = ? AND batch_id = ?', [studentId, batchId]);
+    const [enrollmentRows] = await db.execute('SELECT status, last_read_guideline_at FROM enrollments WHERE student_id = ? AND batch_id = ?', [studentId, batchId]);
     const enrollment = enrollmentRows[0];
     if (!enrollment || enrollment.status !== 'approved') {
       return res.status(403).json({ error: 'You are not enrolled or approved for this batch.' });
     }
 
     const [batchRows] = await db.execute(`
-      SELECT b.*, c.name as course_name, c.category, u.name as instructor_name
+      SELECT b.*, c.name as course_name, c.category, u.name as instructor_name, e.last_read_guideline_at
       FROM batches b
       JOIN courses c ON b.course_id = c.id
       LEFT JOIN users u ON b.instructor_id = u.id
-      WHERE b.id = ?
-    `, [batchId]);
+      JOIN enrollments e ON b.id = e.batch_id
+      WHERE b.id = ? AND e.student_id = ?
+    `, [batchId, studentId]);
+
+    if (batchRows.length === 0) return res.status(404).json({ error: 'Batch workspace not found or unauthorized' });
+
     const batch = batchRows[0];
 
-    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    // Fetch Materials Stack
+    const [materials] = await db.execute('SELECT * FROM batch_materials WHERE batch_id = ? ORDER BY created_at DESC', [batchId]);
+    batch.materials = materials;
 
-    let visibleSessionLink = null;
-    if (batch.session_link && batch.session_date && batch.session_time && batch.is_finalized) {
-      const now = new Date(nowIST());
-      const sessionStart = new Date(`${batch.session_date.toISOString().split('T')[0]}T${batch.session_time}`);
-      const diffMins = (sessionStart.getTime() - now.getTime()) / (1000 * 60);
-
-      if (diffMins <= 30 && diffMins > -120) {
-        visibleSessionLink = batch.session_link;
-      }
-    }
+    // Always return session details so the frontend can manage the 10-minute join window
+    const visibleSessionLink = batch.session_link && batch.is_finalized ? batch.session_link : null;
 
     const totalClasses = batch.duration_days;
     const [attRows] = await db.execute(`SELECT COUNT(*) as count FROM attendance WHERE batch_id = ? AND student_id = ? AND status = 'present'`, [batchId, studentId]);
@@ -693,6 +716,7 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
 
     res.json({
       ...batch,
+      last_read_guideline_at: enrollment.last_read_guideline_at,
       session_link: visibleSessionLink, 
       attendance: {
         totalClasses,
@@ -730,6 +754,83 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
   }
 });
 
+// GET /api/batches/:id/materials - Fetch materials stack
+router.get('/:id/materials', authenticateToken, async (req, res) => {
+  const batchId = req.params.id;
+  try {
+    const [rows] = await db.execute('SELECT * FROM batch_materials WHERE batch_id = ? ORDER BY created_at DESC', [batchId]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch materials' });
+  }
+});
+
+// POST /api/batches/:id/materials - Add to materials stack
+router.post('/:id/materials', authenticateToken, async (req, res) => {
+  const batchId = req.params.id;
+  const { message, link } = req.body;
+
+  try {
+    const [batchRows] = await db.execute('SELECT instructor_id FROM batches WHERE id = ?', [batchId]);
+    const batch = batchRows[0];
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    if (req.user.role !== 'admin' && batch.instructor_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    await db.execute('INSERT INTO batch_materials (batch_id, message, link) VALUES (?, ?, ?)', [batchId, message, link]);
+    res.json({ message: 'Material published successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to publish material' });
+  }
+});
+
+// DELETE /api/batches/materials/:id - Delete specific material
+router.delete('/materials/:id', authenticateToken, async (req, res) => {
+    const materialId = req.params.id;
+    try {
+        const [rows] = await db.execute('SELECT batch_id FROM batch_materials WHERE id = ?', [materialId]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Material not found' });
+        
+        const batchId = rows[0].batch_id;
+        const [batchRows] = await db.execute('SELECT instructor_id FROM batches WHERE id = ?', [batchId]);
+        const batch = batchRows[0];
+        
+        if (req.user.role !== 'admin' && batch.instructor_id !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        await db.execute('DELETE FROM batch_materials WHERE id = ?', [materialId]);
+        res.json({ message: 'Material deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete material' });
+    }
+});
+
+// DELETE /api/batches/:id/material - instructor/admin (DEPRECATED, but kept for legacy compat if needed)
+router.delete('/:id/material', authenticateToken, async (req, res) => {
+  const batchId = req.params.id;
+
+  try {
+    const [batchRows] = await db.execute('SELECT instructor_id FROM batches WHERE id = ?', [batchId]);
+    const batch = batchRows[0];
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    if (req.user.role !== 'admin' && batch.instructor_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    await db.execute('UPDATE batches SET material_link = NULL, material_message = NULL WHERE id = ?', [batchId]);
+    res.json({ message: 'Legacy course materials cleared' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete materials' });
+  }
+});
+
 // PUT /api/batches/:id/finalize-course - instructor/admin
 router.put('/:id/finalize-course', authenticateToken, async (req, res) => {
   const batchId = req.params.id;
@@ -744,25 +845,24 @@ router.put('/:id/finalize-course', authenticateToken, async (req, res) => {
     const batch = batchRows[0];
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-    if (batch.batch_status !== 'active') {
-      return res.status(400).json({ error: 'Only an active batch can be inherently finalized.' });
-    }
-
     if (req.user.role !== 'admin' && batch.instructor_id !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const verificationDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const today = todayIST();
+    const verificationDeadline = futureIST(48 * 60 * 60 * 1000);
             
     await db.execute(`
        UPDATE batches 
        SET batch_status = 'completed', 
+           attendance_completed = 1,
+           instructor_verified = 1,
            enrollment_status = 'closed', 
            end_date = ?, 
            verification_deadline = ?,
            material_link = NULL, 
            material_message = NULL,
+           broadcast_message = NULL,
            session_link = NULL,
            session_time = NULL,
            session_message = NULL
@@ -776,12 +876,17 @@ router.put('/:id/finalize-course', authenticateToken, async (req, res) => {
        WHERE e.batch_id = ? AND e.status = 'approved'
     `, [batchId]);
 
+    const { notifyVerificationPending, notifyAdminOfVerification } = require('../lib/emailService');
+
+    // Notify Students
     if (students.length > 0) {
-      const { notifyVerificationPending } = require('../lib/emailService');
       await notifyVerificationPending(students, batch.name);
     }
+
+    // Notify Admin
+    await notifyAdminOfVerification(batch.name, req.user.name, batch.course_name);
     
-    res.json({ message: 'Course successfully finalized! 2-day verification window started.' });
+    res.json({ message: 'Course successfully verified by instructor! 2-day admin verification window started.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to finalize course' });

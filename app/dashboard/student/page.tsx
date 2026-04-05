@@ -1,17 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Award, Layers, Search, Clock, Calendar, Download, Loader2, RotateCw, X, PlayCircle, ArrowRight, CheckCircle, Video, Shield, Eye, EyeOff, AlertCircle, XCircle, FileText, Menu, LogOut, BarChart3, User } from "lucide-react";
+import { BookOpen, Award, Layers, Search, Clock, Calendar, Download, Loader2, RotateCw, X, PlayCircle, ArrowRight, CheckCircle, Video, Shield, Eye, EyeOff, AlertCircle, XCircle, FileText, Menu, LogOut, BarChart3, User, LockKeyhole as Lock } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import axios from "axios";
-import PaymentGateway from "@/components/PaymentGateway";
 import { useAuthGuard } from "@/app/hooks/useAuthGuard";
 import { API_ENDPOINTS, BACKEND_URL } from "@/app/lib/api";
 
-export default function StudentDashboard() {
+const formatTo12Hr = (timeStr: string) => {
+    if (!timeStr) return "";
+    try {
+        const [hours, minutes] = timeStr.split(':');
+        let h = parseInt(hours);
+        const m = minutes;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        h = h ? h : 12;
+        return `${h}:${m} ${ampm}`;
+    } catch (e) {
+        return timeStr;
+    }
+};
+
+const checkJoinable = (sessionDateStr: string, sessionTimeStr: string) => {
+    if (!sessionDateStr || !sessionTimeStr) return false;
+    try {
+        const sessionDate = new Date(sessionDateStr);
+        const [hours, minutes] = sessionTimeStr.split(':');
+        sessionDate.setHours(parseInt(hours), parseInt(minutes), 0);
+        const now = new Date();
+        const diffInMinutes = (sessionDate.getTime() - now.getTime()) / 60000;
+        // Joinable from 10 mins before until 2 hours after
+        return diffInMinutes <= 10 && diffInMinutes > -120;
+    } catch (e) {
+        return false;
+    }
+};
+
+function StudentDashboardContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     // Protect against browser back/forward button bypassing auth
     useAuthGuard('student');
@@ -41,19 +71,29 @@ export default function StudentDashboard() {
     const [enrollSuccess, setEnrollSuccess] = useState("");
     const [enrollError, setEnrollError] = useState("");
 
-    // Payment Modal
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentBatch, setPaymentBatch] = useState<any>(null);
-    const [transactionId, setTransactionId] = useState("");
-    const [publicSettings, setPublicSettings] = useState<any>({ upi_id: "", upi_qr_image: "" });
+    // No local payment modal state — payment opens as a separate page
 
     const [waitlistedBatches, setWaitlistedBatches] = useState<number[]>([]);
+    const [courseSearch, setCourseSearch] = useState("");
+    const [publicSettings, setPublicSettings] = useState<any>(null);
+
+    // Handle return from payment page
+    useEffect(() => {
+        const paymentResult = searchParams.get('payment');
+        if (paymentResult === 'success') {
+            setEnrollSuccess("Payment submitted! Awaiting team verification.");
+            setActiveTab('my-courses');
+            // Clean the query param from the URL without a full reload
+            router.replace('/dashboard/student', { scroll: false });
+            fetchStats();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 setShowCourseModal(false);
-                setShowPaymentModal(false);
                 setIsMobileMenuOpen(false);
             }
         };
@@ -144,10 +184,10 @@ export default function StudentDashboard() {
     };
 
     const handleLogout = () => {
-        const itemsToRemove = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
-        itemsToRemove.forEach(item => localStorage.removeItem(item));
+        const keys = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
+        keys.forEach(k => localStorage.removeItem(k));
         sessionStorage.clear();
-        router.replace('/login');
+        window.location.href = "/login";
     };
 
     useEffect(() => {
@@ -218,7 +258,6 @@ export default function StudentDashboard() {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setShowPaymentModal(false);
             setEnrollSuccess("You would be approved by our team shortly and receive an success message");
             fetchStats();
             fetchAvailableCourses();
@@ -530,50 +569,294 @@ export default function StudentDashboard() {
                         )}
 
                         {activeTab === 'available' && (
-                            <div className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {loadingAvailable ? (
-                                    <div className="col-span-full py-24 flex flex-col items-center justify-center">
-                                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* Header + Search */}
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest opacity-60">
+                                            {availableCourses.filter(c => !stats?.enrollments?.some((e: any) => e.course_id === c.id)).length} courses available
+                                        </p>
                                     </div>
-                                ) : availableCourses?.length > 0 ? availableCourses.filter(c => !stats?.enrollments?.some((e: any) => e.course_id === c.id)).map((course) => (
-                                    <div key={course.id} className="glass-panel p-8 rounded-[2rem] border border-border/20 flex flex-col">
-                                        <h3 className="text-2xl font-bold mb-3">{course.name}</h3>
-                                        <p className="text-sm text-muted-foreground mb-6 line-clamp-3">{course.description}</p>
-                                        <div className="mt-auto flex justify-between items-center">
-                                            <span className="text-xl font-black">₹{course.starting_price || 'TBA'}</span>
-                                            <button onClick={() => openCourseDetails(course.id)} className="px-6 py-3 bg-primary text-primary-foreground rounded-2xl font-bold text-xs uppercase">Get Started</button>
-                                        </div>
+                                    <div className="relative w-full sm:w-72">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                        <input
+                                            value={courseSearch}
+                                            onChange={e => setCourseSearch(e.target.value)}
+                                            placeholder="Search courses..."
+                                            className="w-full pl-10 pr-4 py-3 bg-muted/50 border border-border/50 rounded-xl text-sm font-medium text-foreground placeholder-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+                                        />
                                     </div>
-                                )) : (
-                                    <div className="col-span-full py-32 text-center text-muted-foreground">No available courses found.</div>
-                                )}
                                 </div>
+
+                                {loadingAvailable ? (
+                                    <div className="py-32 flex flex-col items-center justify-center gap-4">
+                                        <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Loading Courses</p>
+                                    </div>
+                                ) : (() => {
+                                    const filtered = availableCourses
+                                        .filter(c => !stats?.enrollments?.some((e: any) => e.course_id === c.id))
+                                        .filter(c => !courseSearch || c.name.toLowerCase().includes(courseSearch.toLowerCase()) || c.description?.toLowerCase().includes(courseSearch.toLowerCase()));
+
+                                    if (filtered.length === 0) return (
+                                        <div className="py-32 flex flex-col items-center justify-center text-center gap-4">
+                                            <div className="w-20 h-20 rounded-[2rem] bg-muted/40 border border-border/30 flex items-center justify-center">
+                                                <Search className="w-8 h-8 text-muted-foreground opacity-20" />
+                                            </div>
+                                            <div>
+                                                <p className="text-lg font-black text-foreground mb-1">{courseSearch ? 'No Results Found' : 'No Courses Available'}</p>
+                                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest opacity-60">{courseSearch ? `No courses match "${courseSearch}"` : 'Check back later for new courses'}</p>
+                                            </div>
+                                            {courseSearch && <button onClick={() => setCourseSearch('')} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity">Clear search</button>}
+                                        </div>
+                                    );
+
+                                    return (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {filtered.map((course: any) => {
+                                                const hasOpenEnrollment = course.open_batches > 0;
+                                                const hasUpcoming = course.upcoming_batches > 0;
+                                                const isActive = course.active_batches > 0;
+                                                return (
+                                                    <div
+                                                        key={course.id}
+                                                        className="group relative glass-panel rounded-[2rem] border border-border/20 flex flex-col overflow-hidden hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 hover:-translate-y-1"
+                                                    >
+                                                        {/* Top accent */}
+                                                        <div className={`h-1 w-full ${hasOpenEnrollment ? 'bg-gradient-to-r from-emerald-500/60 to-emerald-400/20' : hasUpcoming ? 'bg-gradient-to-r from-amber-500/60 to-amber-400/20' : 'bg-gradient-to-r from-primary/30 to-primary/5'}`} />
+
+                                                        <div className="p-7 flex flex-col flex-1">
+                                                            {/* Status Badge */}
+                                                            <div className="flex items-center justify-between mb-5">
+                                                                {hasOpenEnrollment ? (
+                                                                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                                                        Enrollment Open
+                                                                    </span>
+                                                                ) : hasUpcoming || isActive ? (
+                                                                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                                                                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                                                                        {isActive ? 'In Progress' : 'Upcoming'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-2.5 py-1 bg-muted/50 border border-border/30 rounded-lg text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                                        Coming Soon
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider opacity-50">{course.batch_count || 0} Batches</span>
+                                                            </div>
+
+                                                            {/* Title + Description */}
+                                                            <h3 className="text-lg font-black text-foreground tracking-tight mb-2 line-clamp-2 group-hover:text-primary transition-colors duration-300 leading-tight">{course.name}</h3>
+                                                            <p className="text-xs text-muted-foreground font-medium leading-relaxed line-clamp-3 mb-6 flex-1">{course.description || 'No description available.'}</p>
+
+                                                            {/* Meta Row */}
+                                                            <div className="flex items-center gap-4 mb-6 pb-5 border-b border-border/30">
+                                                                {course.max_duration && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Clock className="w-3 h-3 text-muted-foreground opacity-50" />
+                                                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{course.max_duration} Days</span>
+                                                                    </div>
+                                                                )}
+                                                                {course.active_batches > 0 && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{course.active_batches} Live</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Footer */}
+                                                            <div className="flex items-center justify-between mt-auto gap-3">
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-0.5">Starting From</p>
+                                                                    <p className="text-xl font-black text-foreground">₹{course.starting_price?.toLocaleString('en-IN') || 'TBA'}</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => openCourseDetails(course.id)}
+                                                                    className="px-5 py-3 bg-primary text-primary-foreground rounded-xl font-black text-[10px] uppercase tracking-widest hover:opacity-90 hover:scale-[1.03] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                                                                >
+                                                                    View Details
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 
                         {activeTab === 'my-courses' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {stats?.enrollments?.filter((e: any) => e.batch_status !== 'completed' && e.batch_status !== 'closed').length > 0 ? (
-                                    stats.enrollments.filter((e: any) => e.batch_status !== 'completed' && e.batch_status !== 'closed').map((enr: any) => (
-                                        <div key={enr.id} className="glass-panel p-8 rounded-[2rem] border border-border/50 flex flex-col">
-                                            <div className="flex justify-between mb-4">
-                                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase text-white bg-opacity-20 ${enr.status === 'approved' ? 'bg-emerald-500' : enr.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}>{enr.status}</span>
-                                                <BookOpen className="w-6 h-6 opacity-30" />
-                                            </div>
-                                            <h3 className="text-2xl font-black mb-2">{enr.course_name}</h3>
-                                            <p className="text-sm text-muted-foreground mb-6">{enr.batch_name}</p>
-                                            
-                                            {enr.status === 'approved' && (
-                                                <div className="mt-auto">
-                                                    <Link href={`/dashboard/student/workspace/${enr.batch_id}`} className="w-full py-4 bg-primary text-primary-foreground rounded-2xl text-sm font-black uppercase flex justify-center items-center gap-2">ENTER WORKSPACE <ArrowRight className="w-4 h-4" /></Link>
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {(() => {
+                                    const activeEnrollments = stats?.enrollments?.filter((e: any) => e.batch_status !== 'completed' && e.batch_status !== 'closed' && !e.attendance_completed) || [];
+                                    if (activeEnrollments.length === 0) return (
+                                        <div className="py-32 flex flex-col items-center justify-center text-center gap-5">
+                                            <div className="relative">
+                                                <div className="w-24 h-24 rounded-[2rem] bg-muted/40 border border-border/30 flex items-center justify-center">
+                                                    <BookOpen className="w-10 h-10 text-muted-foreground opacity-20" />
                                                 </div>
-                                            )}
+                                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-center">
+                                                    <ArrowRight className="w-3 h-3 text-primary rotate-45" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-xl font-black text-foreground mb-1">No Active Courses</p>
+                                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest opacity-60">Explore available courses to get started</p>
+                                            </div>
+                                            <button onClick={() => setActiveTab('available')} className="px-6 py-3 bg-primary/10 border border-primary/20 text-primary rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-primary/20 transition-all">
+                                                Browse Courses
+                                            </button>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="col-span-full py-32 text-center text-muted-foreground">No active courses found.</div>
-                                )}
+                                    );
+
+                                    return (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {activeEnrollments.map((enr: any) => {
+                                                const isApproved = enr.status === 'approved';
+                                                const isPending = enr.status === 'pending';
+                                                const isRejected = enr.status === 'rejected';
+                                                return (
+                                                    <div key={enr.id} className={`group relative glass-panel rounded-[2rem] border flex flex-col overflow-hidden transition-all duration-300 ${
+                                                        isApproved ? 'border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/5' :
+                                                        isPending  ? 'border-amber-500/20 hover:border-amber-500/30' :
+                                                        'border-rose-500/20 hover:border-rose-500/30'
+                                                    }`}>
+                                                        {/* Color strip */}
+                                                        <div className={`h-1 w-full ${isApproved ? 'bg-gradient-to-r from-emerald-500/70 to-emerald-400/10' : isPending ? 'bg-gradient-to-r from-amber-500/70 to-amber-400/10' : 'bg-gradient-to-r from-rose-500/70 to-rose-400/10'}`} />
+
+                                                        <div className="p-7 flex flex-col flex-1">
+                                                            {/* Header row */}
+                                                            <div className="flex items-start justify-between mb-5 gap-3">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                                        <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                                                                            isApproved ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
+                                                                            isPending  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
+                                                                            'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                                        }`}>{enr.status}</span>
+                                                                        {enr.batch_status && (
+                                                                            <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">{enr.batch_status}</span>
+                                                                        )}
+                                                                        {isApproved && enr.session_link && enr.is_finalized && (
+                                                                            <span className="px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5 animate-pulse">
+                                                                                <Video className="w-2.5 h-2.5" />
+                                                                                Live Session Active
+                                                                            </span>
+                                                                        )}
+                                                                        {enr.broadcast_message && (!enr.last_read_guideline_at || new Date(enr.broadcast_updated_at) > new Date(enr.last_read_guideline_at)) && (
+                                                                            <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 animate-pulse">
+                                                                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                                                                                1 New Notification
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <h3 className="text-lg font-black text-foreground tracking-tight line-clamp-1">{enr.course_name}</h3>
+                                                                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{enr.batch_name}</p>
+                                                                </div>
+                                                                <div className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${
+                                                                    isApproved ? 'bg-emerald-500/5 border-emerald-500/20' :
+                                                                    isPending  ? 'bg-amber-500/5 border-amber-500/20' :
+                                                                    'bg-rose-500/5 border-rose-500/20'
+                                                                }`}>
+                                                                    {isApproved ? <CheckCircle className="w-5 h-5 text-emerald-500" /> :
+                                                                     isPending  ? <Clock className="w-5 h-5 text-amber-500" /> :
+                                                                     <AlertCircle className="w-5 h-5 text-rose-500" />}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Enrolled date */}
+                                                            {enr.enrolled_at && (
+                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium mb-5 opacity-50">
+                                                                    Enrolled {new Date(enr.enrolled_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                </p>
+                                                            )}
+
+                                                            {/* Context message */}
+                                                            {isPending && (
+                                                                <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 mb-5">
+                                                                    <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-0.5">Payment Under Review</p>
+                                                                    <p className="text-[10px] text-amber-700/60 dark:text-amber-300/50 font-medium">Our team is verifying your payment. You'll be notified once approved.</p>
+                                                                </div>
+                                                            )}
+                                                            {isRejected && enr.admin_feedback && (
+                                                                <div className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/15 mb-5">
+                                                                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-0.5">Admin Feedback</p>
+                                                                    <p className="text-[10px] text-rose-500/70 font-medium">"{enr.admin_feedback}"</p>
+                                                                </div>
+                                                            )}
+
+                                                            {/* CTA */}
+                                                            <div className="mt-auto pt-4 space-y-3">
+                                                                {isApproved && (
+                                                                    <>
+                                                                        {enr.session_link && enr.is_finalized && (
+                                                                            <div className="space-y-2 mb-2">
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-primary">Active Broadcast</span>
+                                                                                    {enr.session_time && (
+                                                                                        <span className="text-[9px] font-bold text-muted-foreground opacity-50 flex items-center gap-1">
+                                                                                            <Clock className="w-2.5 h-2.5" /> {formatTo12Hr(enr.session_time)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                {(() => {
+                                                                                    const canJoin = checkJoinable(enr.session_date, enr.session_time);
+                                                                                    if (!canJoin) {
+                                                                                        return (
+                                                                                            <div className="w-full py-3 bg-muted/30 border border-border/20 text-muted-foreground rounded-xl text-[9px] font-bold uppercase tracking-widest flex flex-col items-center gap-1 opacity-70">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <Lock className="w-3 h-3" /> Join active 10m before start
+                                                                                                </div>
+                                                                                                <span className="text-[8px] opacity-50">{enr.session_date ? new Date(enr.session_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''} @ {formatTo12Hr(enr.session_time)}</span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                    return (
+                                                                                        <a
+                                                                                            href={enr.session_link}
+                                                                                            target="_blank"
+                                                                                            rel="noopener noreferrer"
+                                                                                            className="w-full py-3 bg-primary/10 border border-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest flex justify-center items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-all group"
+                                                                                        >
+                                                                                            <Video className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" /> Join Live Session
+                                                                                        </a>
+                                                                                    );
+                                                                                })()}
+                                                                            </div>
+                                                                        )}
+                                                                        <Link
+                                                                            href={`/dashboard/student/workspace/${enr.batch_id}`}
+                                                                            className="w-full py-3.5 bg-primary text-primary-foreground rounded-xl text-[11px] font-black uppercase tracking-widest flex justify-center items-center gap-2 hover:opacity-90 hover:scale-[1.01] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                                                                        >
+                                                                            Enter Workspace <ArrowRight className="w-3.5 h-3.5" />
+                                                                        </Link>
+                                                                    </>
+                                                                )}
+                                                                {isRejected && (
+                                                                    <button
+                                                                        onClick={() => handleClearRejection(enr.id)}
+                                                                        className="w-full py-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl text-[11px] font-black uppercase tracking-widest flex justify-center items-center gap-2 hover:bg-rose-500/20 active:scale-95 transition-all"
+                                                                    >
+                                                                        <XCircle className="w-3.5 h-3.5" /> Clear & Re-enroll
+                                                                    </button>
+                                                                )}
+                                                                {isPending && (
+                                                                    <div className="w-full py-3 bg-muted/50 border border-border/30 rounded-xl text-[10px] font-black uppercase tracking-widest flex justify-center items-center gap-2 text-muted-foreground cursor-default">
+                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Awaiting Verification
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 
@@ -591,9 +874,11 @@ export default function StudentDashboard() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                    {stats?.enrollments?.filter((e: any) => e.batch_status === 'completed').length > 0 ? 
-                                        stats.enrollments.filter((e: any) => e.batch_status === 'completed').map((enr: any) => {
+                                    {stats?.enrollments?.filter((e: any) => e.batch_status === 'completed' || e.attendance_completed).length > 0 ? 
+                                        stats.enrollments.filter((e: any) => e.batch_status === 'completed' || e.attendance_completed).map((enr: any) => {
                                             const isArchived = !!enr.archived_at;
+                                            const isInstructorVerified = !!enr.instructor_verified;
+                                            const isAttendanceDone = !!enr.attendance_completed;
                                             const cert = stats?.certificates?.find((c: any) => c.batch_id === enr.batch_id);
                                             const hasCert = !!cert;
 
@@ -611,13 +896,19 @@ export default function StudentDashboard() {
                                                             {hasCert && (
                                                                 <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-1.5">
                                                                     <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Digital Record Verified</span>
+                                                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Record Verified</span>
                                                                 </div>
                                                             )}
-                                                            {!isArchived && (
+                                                            {!hasCert && isInstructorVerified && !isArchived && (
+                                                                <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center gap-1.5 animate-pulse">
+                                                                    <Shield className="w-3 h-3 text-blue-500" />
+                                                                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Admin Sync Pending</span>
+                                                                </div>
+                                                            )}
+                                                            {!hasCert && isAttendanceDone && !isInstructorVerified && (
                                                                 <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-1.5 animate-pulse">
                                                                     <Clock className="w-3 h-3 text-amber-500" />
-                                                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Verification Pending</span>
+                                                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Instructor Review</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -642,8 +933,14 @@ export default function StudentDashboard() {
                                                             </div>
                                                         ) : !isArchived ? (
                                                             <div className="mt-2 p-5 bg-black/20 rounded-2xl border border-white/5 space-y-2 flex-grow">
-                                                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-2">Archiving Process Initiated</p>
-                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">Verification takes up to 48 hours. Estimated available by <span className="text-foreground font-bold">{enr.verification_deadline ? new Date(enr.verification_deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '48 hours'}.</span></p>
+                                                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-2">
+                                                                    {isInstructorVerified ? 'Admin Final Verification' : 'Instructor Reviewing Records'}
+                                                                </p>
+                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                                                    {isInstructorVerified 
+                                                                        ? 'The instructor has verified your records. Your certificate will be published within 2 days. You will be notified once the certificate is available through your respective mail account.' 
+                                                                        : 'The instructor is verifying your records. Your certificate will be published within 2 days. You will be notified once the certificate is available through your respective mail account.'}
+                                                                </p>
                                                             </div>
                                                         ) : (
                                                             <div className="mt-2 p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 flex-grow">
@@ -740,10 +1037,18 @@ export default function StudentDashboard() {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Phone Number</label>
+                                                    <input 
+                                                        value={profileForm.phone} 
+                                                        onChange={e => setProfileForm({...profileForm, phone: e.target.value})} 
+                                                        placeholder="+91 00000 00000" 
+                                                        className="w-full bg-muted/30 border border-border/50 rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold" 
+                                                    />
+                                                </div>
+                                                <div className="space-y-2 md:col-span-2">
                                                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Email Address</label>
                                                     <input 
                                                         value={profileForm.email} 
-                                                        onChange={e => setProfileForm({...profileForm, email: e.target.value})} 
                                                         placeholder="email@example.com" 
                                                         className="w-full bg-muted/30 border border-border/50 rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold opacity-70 cursor-not-allowed" 
                                                         disabled
@@ -827,41 +1132,159 @@ export default function StudentDashboard() {
         </div>
 
         {showCourseModal && selectedCourse && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-md" onClick={() => setShowCourseModal(false)}>
-                <div className="bg-card w-full max-w-3xl rounded-3xl p-10 border border-border" onClick={e => e.stopPropagation()}>
-                    <h2 className="text-3xl font-black mb-2">{selectedCourse.name}</h2>
-                    <p className="text-muted-foreground mb-8">{selectedCourse.description}</p>
-                    <div className="space-y-4">
-                        {selectedCourse.batches?.map((batch: any) => (
-                            <div key={batch.id} className="p-6 bg-muted rounded-2xl flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-bold">{batch.name}</h4>
-                                    <p className="text-xs text-muted-foreground">Ends: {batch.batch_end_date}</p>
-                                </div>
-                                <button onClick={() => { setPaymentBatch(batch); setShowPaymentModal(true); }} className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-xs uppercase">Enroll ₹{batch.price}</button>
+            <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/70 backdrop-blur-lg" onClick={() => setShowCourseModal(false)}>
+                <div
+                    className="bg-card w-full sm:max-w-2xl max-h-[90vh] sm:rounded-3xl rounded-t-3xl border border-border/50 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-8 duration-300"
+                    onClick={e => e.stopPropagation()}
+                >
+                    {/* Modal Header */}
+                    <div className="px-8 pt-8 pb-6 border-b border-border/50 flex-shrink-0">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-2 opacity-70">Course Details</p>
+                                <h2 className="text-2xl font-black text-foreground tracking-tight leading-tight">{selectedCourse.name}</h2>
+                                {selectedCourse.description && (
+                                    <p className="text-xs text-muted-foreground font-medium mt-2 leading-relaxed line-clamp-2">{selectedCourse.description}</p>
+                                )}
                             </div>
-                        ))}
+                            <button
+                                onClick={() => setShowCourseModal(false)}
+                                className="p-2 rounded-xl bg-muted/50 border border-border hover:bg-muted transition-colors flex-shrink-0"
+                            >
+                                <X className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                        </div>
+
+                        {/* Success / Error banners */}
+                        {enrollSuccess && (
+                            <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                                <p className="text-xs font-bold text-emerald-500">{enrollSuccess}</p>
+                            </div>
+                        )}
+                        {enrollError && (
+                            <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                                <p className="text-xs font-bold text-rose-500">{enrollError}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Batch List */}
+                    <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar space-y-3">
+                        {!selectedCourse.batches?.length ? (
+                            <div className="py-20 text-center">
+                                <Calendar className="w-10 h-10 text-muted-foreground opacity-20 mx-auto mb-4" />
+                                <p className="text-sm font-bold text-muted-foreground">No batches scheduled yet</p>
+                                <p className="text-[10px] text-muted-foreground opacity-50 mt-1 uppercase tracking-widest">Check back soon</p>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 mb-4">{selectedCourse.batches.length} Available {selectedCourse.batches.length === 1 ? 'Batch' : 'Batches'}</p>
+                                {selectedCourse.batches.map((batch: any) => {
+                                    const isOpen = batch.batch_status === 'active' && batch.enrollment_status === 'open' && !batch.is_finalized;
+                                    const isUpcoming = batch.batch_status === 'upcoming';
+                                    const isTemporarilyClosed = batch.enrollment_status === 'closed' && !batch.is_finalized;
+                                    const isNotified = waitlistedBatches.includes(batch.id);
+                                    return (
+                                        <div key={batch.id} className={`relative p-5 rounded-2xl border transition-all duration-300 ${
+                                            isOpen ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40' :
+                                            isUpcoming || isTemporarilyClosed ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/30' :
+                                            'bg-muted/30 border-border/30'
+                                        }`}>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                                            batch.batch_status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                                            batch.batch_status === 'upcoming' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                                                            'bg-muted text-muted-foreground'
+                                                        }`}>
+                                                            {batch.batch_status === 'active' ? '● Live' : batch.batch_status === 'upcoming' ? 'Upcoming' : batch.batch_status}
+                                                        </span>
+                                                        {batch.enrollment_status === 'open' && !batch.is_finalized && (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-primary/10 text-primary">
+                                                                Enrolling
+                                                            </span>
+                                                        )}
+                                                        {isTemporarilyClosed && (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                                                Temporarily Closed
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="font-black text-foreground text-sm">{batch.name}</h4>
+                                                    <div className="flex items-center gap-3 mt-1.5">
+                                                        {batch.instructor_name && (
+                                                            <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                                                                <User className="w-2.5 h-2.5" />{batch.instructor_name}
+                                                            </span>
+                                                        )}
+                                                        {batch.price != null && (
+                                                            <span className="text-[10px] font-black text-foreground">₹{Number(batch.price).toLocaleString('en-IN')}</span>
+                                                        )}
+                                                        {(batch.enrolled_count != null && !isTemporarilyClosed) && (
+                                                            <span className="text-[10px] text-muted-foreground">{batch.enrolled_count} enrolled</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-shrink-0">
+                                                    {isOpen ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowCourseModal(false);
+                                                                router.push(
+                                                                    `/dashboard/student/payment?batchId=${batch.id}&batchName=${encodeURIComponent(batch.name)}&price=${batch.price}`
+                                                                );
+                                                            }}
+                                                            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-black text-[10px] uppercase tracking-wider hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                                                        >
+                                                            Enroll Now
+                                                        </button>
+                                                    ) : (isUpcoming || isTemporarilyClosed) ? (
+                                                        isNotified ? (
+                                                            <span className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                                                                <CheckCircle className="w-3 h-3" /> Notified
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleNotifyMe(batch.id)}
+                                                                className="px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl font-black text-[10px] uppercase tracking-wider hover:bg-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+                                                            >
+                                                                🔔 Notify Me
+                                                            </button>
+                                                        )
+                                                    ) : (
+                                                        <span className="px-4 py-2 bg-muted/50 border border-border/40 text-muted-foreground rounded-xl font-bold text-[10px] uppercase tracking-wider">
+                                                            {batch.is_finalized ? 'Finalized' : 'Closed'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="px-8 py-5 border-t border-border/50 flex-shrink-0 flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-50">Snagup Technologies</p>
+                        <button onClick={() => setShowCourseModal(false)} className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">Close</button>
                     </div>
                 </div>
             </div>
         )}
 
-        {showPaymentModal && paymentBatch && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-background/80 backdrop-blur-md">
-                <div className="bg-card w-full max-w-lg rounded-3xl p-10 border border-border">
-                    <PaymentGateway
-                        batch={paymentBatch}
-                        onClose={() => setShowPaymentModal(false)}
-                        onSuccess={() => {
-                            setShowPaymentModal(false);
-                            setEnrollSuccess("Enrollment Successful! Waiting for approval.");
-                            fetchStats();
-                            setActiveTab('my-courses');
-                        }}
-                    />
-                </div>
-            </div>
-        )}
         </>
+    );
+}
+
+export default function StudentDashboard() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+            <StudentDashboardContent />
+        </Suspense>
     );
 }

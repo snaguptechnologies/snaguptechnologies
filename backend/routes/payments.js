@@ -20,8 +20,11 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
                     b.name as batch_name, 
                     b.price as batch_price,
                     b.start_date as batch_start_date,
+                    b.course_id as course_id,
+                    e.batch_id as batch_id,
                     c.name as course_name,
                     p.transaction_id as latest_transaction_id,
+                    p.amount as paid_amount,
                     DATE_FORMAT(p.created_at, '%Y-%m-%dT%H:%i:%sZ') as payment_date,
                     (SELECT JSON_ARRAYAGG(JSON_OBJECT(
                       'id', id, 
@@ -34,7 +37,8 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
             JOIN users u ON e.student_id = u.id
             JOIN batches b ON e.batch_id = b.id
             JOIN courses c ON b.course_id = c.id
-            LEFT JOIN payments p ON p.enrollment_id = e.id AND p.id = (SELECT MAX(id) FROM payments WHERE enrollment_id = e.id)
+            LEFT JOIN (SELECT enrollment_id, MAX(id) as max_id FROM payments GROUP BY enrollment_id) p_max ON p_max.enrollment_id = e.id
+            LEFT JOIN payments p ON p.id = p_max.max_id
             ORDER BY 
                 CASE WHEN e.status = 'pending' THEN 0 ELSE 1 END,
                 e.updated_at DESC,

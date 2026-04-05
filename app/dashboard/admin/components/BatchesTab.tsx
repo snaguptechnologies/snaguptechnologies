@@ -3,7 +3,7 @@
 import React from 'react';
 import { 
     Search, Plus, Loader2, Calendar, PlayCircle, 
-    FileText, Trash2 
+    FileText, Trash2, CheckCircle 
 } from 'lucide-react';
 
 interface BatchesTabProps {
@@ -188,6 +188,16 @@ const BatchesTab: React.FC<BatchesTabProps> = ({
                                                         {isOpen ? 'Enroll Open' : 'Enroll Closed'}
                                                     </span>
                                                 )}
+                                                {!!batch.attendance_completed && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter border bg-blue-500/10 text-blue-500 border-blue-500/20">
+                                                        Attendance Done
+                                                    </span>
+                                                )}
+                                                {!!batch.instructor_verified && (
+                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter border bg-emerald-500 text-white border-emerald-500 shadow-sm">
+                                                        Verified
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 align-middle min-w-[140px]">
@@ -237,7 +247,7 @@ const BatchesTab: React.FC<BatchesTabProps> = ({
                                                 {!batch.is_finalized && (batch.batch_status === 'upcoming' || batch.batch_status === 'active') && (
                                                     <>
                                                         {batch.enrollment_status === 'closed' ? (
-                                                            <button onClick={() => openEditDeadline(batch)} className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all uppercase tracking-widest whitespace-nowrap">
+                                                            <button onClick={() => handleToggleEnrollment(batch.id)} className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all uppercase tracking-widest whitespace-nowrap">
                                                                 Open Enroll
                                                             </button>
                                                         ) : (
@@ -266,8 +276,16 @@ const BatchesTab: React.FC<BatchesTabProps> = ({
                                                     </button>
                                                 )}
                                                 {batch.batch_status === 'completed' && !batch.archived_at && (
-                                                    <button onClick={() => handleArchiveBatch(batch.id)} className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-emerald-500 text-white hover:opacity-90 transition-all uppercase tracking-widest shadow-sm whitespace-nowrap">
-                                                        Archive
+                                                    <button 
+                                                        onClick={() => handleArchiveBatch(batch.id)} 
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest shadow-sm whitespace-nowrap flex items-center gap-2 ${
+                                                            batch.instructor_verified 
+                                                            ? 'bg-emerald-500 text-white hover:bg-emerald-600 scale-105 shadow-emerald-500/20' 
+                                                            : 'bg-muted/50 text-muted-foreground border border-border hover:bg-muted'
+                                                        }`}
+                                                    >
+                                                        {batch.instructor_verified ? <CheckCircle className="w-3.5 h-3.5" /> : null}
+                                                        {batch.instructor_verified ? 'Verify & Archive' : 'Archive'}
                                                     </button>
                                                 )}
                                                 {!!(batch.batch_status === 'closed' || batch.archived_at) && (

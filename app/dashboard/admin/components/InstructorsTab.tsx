@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, Loader2, Trash2, Globe } from 'lucide-react';
+import { Plus, Loader2, Trash2, Globe, Phone } from 'lucide-react';
 
 interface InstructorsTabProps {
     instructors: any[];
@@ -55,8 +55,15 @@ const InstructorsTab: React.FC<InstructorsTabProps> = ({
                                         </div>
                                     </td>
                                     <td className="py-8 px-8">
-                                        <div className="flex items-center gap-3 text-sm font-bold text-foreground/60 group-hover:text-foreground transition-colors">
-                                            <Globe className="w-4 h-4 text-muted-foreground/50" /> {inst.email}
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-3 text-sm font-bold text-foreground/60 group-hover:text-foreground transition-colors">
+                                                <Globe className="w-3.5 h-3.5 text-muted-foreground/50" /> {inst.email}
+                                            </div>
+                                            {inst.phone && (
+                                                <div className="flex items-center gap-3 text-sm font-bold text-foreground/60 group-hover:text-foreground transition-colors">
+                                                    <Phone className="w-3.5 h-3.5 text-muted-foreground/50" /> {inst.phone}
+                                                </div>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="py-8 px-8 text-right font-black text-[11px] text-muted-foreground tracking-widest opacity-50">

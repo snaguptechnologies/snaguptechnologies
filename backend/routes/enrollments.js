@@ -21,6 +21,9 @@ router.post('/', authenticateToken, requireRole('student'), async (req, res) => 
         if (batch.is_finalized) {
             return res.status(400).json({ error: 'Enrollment for this batch is permanently closed (Finalized).' });
         }
+        if (batch.batch_status !== 'active') {
+            return res.status(400).json({ error: `Enrollment is only open for active batches. This batch is currently '${batch.batch_status}'.` });
+        }
         if (batch.enrollment_status !== 'open') {
             return res.status(400).json({ error: 'Enrollment has been manually closed for this batch' });
         }
@@ -93,13 +96,13 @@ router.get('/', authenticateToken, async (req, res) => {
 
     let query = `
     SELECT e.*, 
-      s.name as student_name, s.email as student_email,
-      b.name as batch_name, b.price as batch_price, c.name as course_name,
+      s.name as student_name, s.email as student_email, s.phone as student_phone,
+      b.name as batch_name, b.price as batch_price, b.course_id as course_id, e.batch_id as batch_id, c.name as course_name,
       DATE_FORMAT(e.enrolled_at, '%Y-%m-%dT%H:%i:%sZ') as enrolled_at,
       DATE_FORMAT(e.updated_at, '%Y-%m-%dT%H:%i:%sZ') as updated_at,
       (SELECT transaction_id FROM payments WHERE enrollment_id = e.id ORDER BY created_at DESC LIMIT 1) as transaction_id,
       (SELECT status FROM payments WHERE enrollment_id = e.id ORDER BY created_at DESC LIMIT 1) as payment_status,
-      (SELECT SUM(amount) FROM payments WHERE enrollment_id = e.id AND status = 'completed') as paid_amount,
+      (SELECT amount FROM payments WHERE enrollment_id = e.id ORDER BY created_at DESC LIMIT 1) as paid_amount,
       (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', id, 'transaction_id', transaction_id, 'amount', amount, 'status', status, 'created_at', DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ'))) FROM payments WHERE enrollment_id = e.id) as payment_history,
       e.is_utr_updated
     FROM enrollments e
@@ -276,6 +279,89 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     } catch (err) {
         if (connection) await connection.rollback();
         res.status(400).json({ error: err.message });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// PUT /api/enrollments/bulk-status - admin only
+router.put('/bulk-status', authenticateToken, requireRole('admin'), async (req, res) => {
+    const { ids, status, category = 'full', feedback = '' } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'IDs array required' });
+    if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+
+    let connection;
+    try {
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        for (const enrollmentId of ids) {
+            // Update enrollment status
+            await connection.execute(`
+                UPDATE enrollments 
+                SET status = ?, rejection_category = ?, admin_feedback = ?, is_utr_updated = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `, [status, category, feedback, enrollmentId]);
+
+            // Handle payment status shift if approved
+            if (status === 'approved') {
+                const [batchPriceRows] = await connection.execute(`SELECT price FROM batches WHERE id = (SELECT batch_id FROM enrollments WHERE id = ?)`, [enrollmentId]);
+                const batchPrice = batchPriceRows[0]?.price || 0;
+                
+                const [existingPaidRows] = await connection.execute(`SELECT SUM(amount) as sum FROM payments WHERE enrollment_id = ? AND status = 'completed'`, [enrollmentId]);
+                const existingPaidSum = existingPaidRows[0]?.sum || 0;
+                
+                const balance = Math.max(0, (batchPrice) - (existingPaidSum));
+
+                await connection.execute(`
+                    UPDATE payments 
+                    SET status = 'completed', 
+                        amount = CASE WHEN amount = 0 THEN ? ELSE amount END 
+                    WHERE enrollment_id = ? AND status = 'pending'
+                `, [balance, enrollmentId]);
+            }
+
+            // Fetch enrollment details for notifications
+            const [enrollRows] = await connection.execute(`
+                SELECT e.*, u.name as user_name, u.email, b.name as batch_name, c.name as course_name, b.price, b.start_date, b.broadcast_message, i.name as instructor_name
+                FROM enrollments e
+                JOIN users u ON e.student_id = u.id
+                JOIN batches b ON e.batch_id = b.id
+                JOIN courses c ON b.course_id = c.id
+                LEFT JOIN users i ON b.instructor_id = i.id
+                WHERE e.id = ?
+            `, [enrollmentId]);
+            
+            const enrollment = enrollRows[0];
+            if (enrollment) {
+                if (status === 'approved') {
+                    notifyEnrollmentSuccess(
+                        { name: enrollment.user_name, email: enrollment.email },
+                        enrollment.batch_name,
+                        {
+                            courseName: enrollment.course_name,
+                            price: enrollment.price,
+                            start_date: enrollment.start_date,
+                            instructor_name: enrollment.instructor_name,
+                            broadcast_message: enrollment.broadcast_message
+                        }
+                    ).catch(console.error);
+                } else if (status === 'rejected') {
+                    notifyEnrollmentRejected(
+                        { name: enrollment.user_name, email: enrollment.email },
+                        enrollment.batch_name,
+                        feedback
+                    ).catch(console.error);
+                }
+            }
+        }
+
+        await connection.commit();
+        res.json({ message: `Bulk processed ${ids.length} enrollments.` });
+    } catch (err) {
+        if (connection) await connection.rollback();
+        console.error("Bulk process error:", err);
+        res.status(500).json({ error: 'Failed to process bulk operation' });
     } finally {
         if (connection) connection.release();
     }

@@ -2,19 +2,23 @@ require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
+const dbHost = process.env.DB_HOST || 'localhost';
+
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: dbHost,
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   port: parseInt(process.env.DB_PORT || '3306'),
+  database: process.env.DB_NAME || 'snagup',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   multipleStatements: true,
-  ssl: {
+  // Automatic SSL: Default to true if not on localhost, or if explicitly requested
+  ssl: (process.env.DB_SSL === 'true' || (dbHost !== 'localhost' && dbHost !== '127.0.0.1')) ? {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
-  }
+  } : false
 };
 
 const dbName = process.env.DB_NAME || 'snagup';
@@ -40,11 +44,11 @@ async function ensureDatabaseExists() {
         await connection.end();
     } catch (err) {
         if (connection) await connection.end();
-        console.error("❌ MySQL Connection Failed!");
+        console.error("❌ MySQL Connection Failed during initialization!");
         console.error("   Details:", err.message);
         console.error("   Check if your MySQL server is running on port:", dbConfig.port);
         console.error("   Current Configuration:", { host: dbConfig.host, user: dbConfig.user, port: dbConfig.port });
-        process.exit(1);
+        // Removed process.exit(1) to prevent the entire server from crashing
     }
 }
 
@@ -100,6 +104,8 @@ async function initializeTables() {
         broadcast_updated_at DATETIME,
         archived_at DATETIME,
         verification_deadline DATETIME,
+        attendance_completed BOOLEAN DEFAULT 0,
+        instructor_verified BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
         FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE SET NULL
@@ -196,6 +202,15 @@ async function initializeTables() {
         message TEXT,
         status ENUM('pending','contacted','archived') DEFAULT 'pending',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS batch_materials (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_id INT NOT NULL,
+        message TEXT,
+        link TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS settings (

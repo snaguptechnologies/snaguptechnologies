@@ -2,13 +2,27 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Users, User, Layers, CalendarCheck, FileText, X, Check, XCircle, Loader2, Clock, PlayCircle, ArrowLeft, Send, ArrowRight, Shield, Award, CheckCircle, Eye, EyeOff, Menu, BookOpen, LogOut, PenLine, Upload, Trash2, Settings, BarChart3, Calendar } from "lucide-react";
+import { Users, User, Layers, CalendarCheck, FileText, X, Check, XCircle, Loader2, Clock, PlayCircle, ArrowLeft, Send, ArrowRight, Shield, Award, CheckCircle, Eye, EyeOff, Menu, BookOpen, LogOut, PenLine, Upload, Trash2, Settings, BarChart3, Calendar, Phone } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 import { useAuthGuard } from "@/app/hooks/useAuthGuard";
 
 export default function InstructorDashboard() {
+    const formatTo12Hr = (timeStr: string) => {
+        if (!timeStr) return "";
+        try {
+            const [hours, minutes] = timeStr.split(':');
+            let h = parseInt(hours);
+            const m = minutes;
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12;
+            return `${h}:${m} ${ampm}`;
+        } catch (e) {
+            return timeStr;
+        }
+    };
     const router = useRouter();
 
     // Protect against browser back/forward button bypassing auth
@@ -40,12 +54,14 @@ export default function InstructorDashboard() {
     const [materialLinks, setMaterialLinks] = useState<Record<string, string>>({});
     const [materialMessages, setMaterialMessages] = useState<Record<string, string>>({});
     const [manageBatch, setManageBatch] = useState<any>(null);
-    const [manageBatchTab, setManageBatchTab] = useState<'sessions' | 'attendance' | 'guidelines'>('sessions');
+    const [manageBatchTab, setManageBatchTab] = useState<'scheduling' | 'attendance' | 'resources' | 'guidelines'>('scheduling');
     const [broadcastMessage, setBroadcastMessage] = useState("");
     const [broadcastMode, setBroadcastMode] = useState<'portal' | 'email' | 'both'>('both');
     const [broadcastLoading, setBroadcastLoading] = useState(false);
     const [reminderLoading, setReminderLoading] = useState<Record<string, boolean>>({});
     const [syncing, setSyncing] = useState(false);
+    const [materials, setMaterials] = useState<any[]>([]);
+    const [materialsLoading, setMaterialsLoading] = useState(false);
 
     // Settings & Tabs
     const [activeTab, setActiveTab] = useState<'analytics' | 'batches' | 'history' | 'settings'>('batches');
@@ -68,6 +84,21 @@ export default function InstructorDashboard() {
     ];
 
 
+
+    const fetchMaterials = async (batchId: number) => {
+        setMaterialsLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.BATCHS}/${batchId}/materials`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setMaterials(res.data);
+        } catch (err) {
+            console.error("Failed to fetch materials");
+        } finally {
+            setMaterialsLoading(false);
+        }
+    };
 
     const fetchStats = async () => {
         setSyncing(true);
@@ -94,26 +125,54 @@ export default function InstructorDashboard() {
             const mLinks: Record<string, string> = {};
             const mMsgs: Record<string, string> = {};
 
-            // Calculate current local date/time for defaults
+            // Calculate current local date/time for defaults (IST)
             const now = new Date();
-            const localISO = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString();
-            const defaultDate = localISO.split('T')[0];
-            const defaultTime = localISO.split('T')[1].substring(0, 5);
+            const nowIST = new Date(now.getTime() + (5.5 * 3600000));
+            const defaultDate = nowIST.toISOString().split('T')[0];
+            const defaultTime = nowIST.toISOString().split('T')[1].substring(0, 5);
 
             res.data.myBatches?.forEach((b: any) => {
-                links[b.id] = b.session_link || "";
+                // Link
+                if (!sessionLinks[b.id]) {
+                    links[b.id] = b.session_link || "";
+                } else {
+                    links[b.id] = sessionLinks[b.id];
+                }
+
+                // Date normalization (YYYY-MM-DD for input type="date")
+                let normalizedDate = b.session_date;
+                if (normalizedDate && normalizedDate.includes('T')) {
+                    normalizedDate = normalizedDate.split('T')[0];
+                } else if (normalizedDate && normalizedDate.length > 10) {
+                    normalizedDate = normalizedDate.substring(0, 10);
+                }
 
                 // Default to current date/time if no session is set OR if set session is in the past
-                let shouldUseDefault = !b.session_date || !b.session_time;
+                let shouldUseDefault = !normalizedDate || !b.session_time;
                 if (!shouldUseDefault) {
-                    const planDateTime = new Date(`${b.session_date}T${b.session_time}`);
+                    const planDateTime = new Date(`${normalizedDate}T${b.session_time}`);
                     if (planDateTime < now) shouldUseDefault = true;
                 }
 
-                times[b.id] = shouldUseDefault ? defaultTime : b.session_time;
-                dates[b.id] = shouldUseDefault ? defaultDate : b.session_date;
+                // Only set if not already present in local state (to avoid overwriting user input)
+                if (!sessionTimes[b.id]) {
+                    times[b.id] = shouldUseDefault ? defaultTime : b.session_time;
+                } else {
+                    times[b.id] = sessionTimes[b.id];
+                }
 
-                msgs[b.id] = b.session_message || "";
+                if (!sessionDates[b.id]) {
+                    dates[b.id] = shouldUseDefault ? defaultDate : normalizedDate;
+                } else {
+                    dates[b.id] = sessionDates[b.id];
+                }
+
+                if (!sessionMessage[b.id]) {
+                    msgs[b.id] = b.session_message || "";
+                } else {
+                    msgs[b.id] = sessionMessage[b.id];
+                }
+
                 mLinks[b.id] = b.material_link || "";
                 mMsgs[b.id] = b.material_message || "";
             });
@@ -178,10 +237,10 @@ export default function InstructorDashboard() {
     };
 
     const handleLogout = () => {
-        const itemsToRemove = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
-        itemsToRemove.forEach(item => localStorage.removeItem(item));
+        const keys = ["snagup_token", "snagup_user", "snagup_role", "user_role"];
+        keys.forEach(k => localStorage.removeItem(k));
         sessionStorage.clear();
-        router.replace('/login');
+        window.location.href = "/login";
     };
 
     useEffect(() => {
@@ -207,7 +266,13 @@ export default function InstructorDashboard() {
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [router]);
+    }, []);
+
+    useEffect(() => {
+        if (manageBatch) {
+            fetchMaterials(manageBatch.id);
+        }
+    }, [manageBatch]);
 
     useEffect(() => {
         const handleToggle = () => setIsMobileMenuOpen(prev => !prev);
@@ -313,16 +378,38 @@ export default function InstructorDashboard() {
         setMaterialLoading({ ...materialLoading, [batchId]: true });
         try {
             const token = localStorage.getItem("snagup_token");
-            await axios.put(`${API_ENDPOINTS.BATCHS}/${batchId}/material`, {
-                material_link: link,
-                material_message: msg
+            await axios.post(`${API_ENDPOINTS.BATCHS}/${batchId}/materials`, {
+                link,
+                message: msg
             }, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Materials updated successfully!");
+            alert("Material published successfully!");
+            setMaterialLinks({ ...materialLinks, [batchId]: "" });
+            setMaterialMessages({ ...materialMessages, [batchId]: "" });
+            fetchMaterials(batchId);
+            fetchStats();
         } catch (err) {
-            alert("Failed to update materials");
+            alert("Failed to publish material");
             console.error(err);
         } finally {
             setMaterialLoading({ ...materialLoading, [batchId]: false });
+        }
+    };
+
+    const handleDeleteMaterial = async (materialId: number, batchId: number) => {
+        if (!confirm("Are you sure you want to delete this resource?")) return;
+        setMaterialLoading({ ...materialLoading, [materialId]: true });
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.delete(`${API_ENDPOINTS.BATCHS}/materials/${materialId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("Resource deleted successfully!");
+            fetchMaterials(batchId);
+        } catch (err) {
+            alert("Failed to delete resource");
+            console.error(err);
+        } finally {
+            setMaterialLoading({ ...materialLoading, [materialId]: false });
         }
     };
 
@@ -694,18 +781,21 @@ export default function InstructorDashboard() {
                                                 batch.batch_status === 'closed' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' :
                                                 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                                                 }`}>
-                                                {batch.batch_status === 'active' ? '• LIVE' : batch.batch_status === 'completed' ? 'COMPLETED' : batch.batch_status === 'closed' ? 'CLOSED' : 'UPCOMING'}
+                                                {batch.batch_status === 'active' ? '• LIVE' : 
+                                                 batch.instructor_verified ? 'VERIFIED' :
+                                                 batch.batch_status === 'completed' ? 'COMPLETED' : 
+                                                 batch.batch_status === 'closed' ? 'CLOSED' : 'UPCOMING'}
                                             </span>
                                         </div>
 
-                                        <div className="space-y-3 mb-6">
-                                            <div className="flex items-center justify-between text-xs p-2 bg-background/50 rounded-lg">
-                                                <span className="text-muted-foreground font-medium">Enrolled Students</span>
-                                                <span className="text-foreground font-bold">{batch.enrolled_count}</span>
+                                        <div className="space-y-2 mb-6">
+                                            <div className="flex items-center justify-between text-[11px] p-2.5 bg-background/50 rounded-xl border border-border/5">
+                                                <span className="text-muted-foreground font-bold uppercase tracking-wider">Enrolled</span>
+                                                <span className="text-foreground font-black">{batch.enrolled_count} Students</span>
                                             </div>
-                                            <div className="flex items-center justify-between text-xs p-2 bg-background/50 rounded-lg mt-2">
-                                                <span className="text-muted-foreground font-medium">Sessions</span>
-                                                <span className="text-foreground font-bold text-right ml-2">{batch.sessions_completed || 0} days completed out of {batch.duration_days} days</span>
+                                            <div className="flex items-center justify-between text-[11px] p-2.5 bg-background/50 rounded-xl border border-border/5">
+                                                <span className="text-muted-foreground font-bold uppercase tracking-wider">Progress</span>
+                                                <span className="text-foreground font-black uppercase">{batch.sessions_completed || 0} / {batch.duration_days} Days</span>
                                             </div>
                                         </div>
                                     </div>
@@ -777,16 +867,23 @@ export default function InstructorDashboard() {
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
                                 <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                                    manageBatch.instructor_verified ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' :
                                     manageBatch.batch_status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
-                                    manageBatch.batch_status === 'completed' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                                    manageBatch.batch_status === 'completed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
                                     manageBatch.batch_status === 'closed' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' :
                                     'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                    {manageBatch.batch_status === 'active' ? '● LIVE' : manageBatch.batch_status.toUpperCase()}
+                                    {manageBatch.instructor_verified ? '✓ Record Verified' : 
+                                     manageBatch.batch_status === 'active' ? '● LIVE' : 
+                                     manageBatch.batch_status.toUpperCase()}
                                 </span>
                                 <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
-                                    manageBatch.is_finalized ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                    manageBatch.instructor_verified ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                    manageBatch.is_finalized ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 
+                                    'bg-amber-500/10 text-amber-500 border-amber-500/20'
                                 }`}>
-                                    {manageBatch.is_finalized ? '✓ Finalized' : '⏳ Awaiting Finalization'}
+                                    {manageBatch.instructor_verified ? '⏳ Awaiting Admin Sync' :
+                                     manageBatch.is_finalized ? '✓ Finalized' : 
+                                     '⏳ Awaiting Finalization'}
                                 </span>
                                 <span className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-muted/60 text-muted-foreground border border-border">
                                     {manageBatch.enrolled_count} Students · {manageBatch.duration_days} Days
@@ -794,21 +891,22 @@ export default function InstructorDashboard() {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* Subtab Navigation */}
                     <div className="flex flex-wrap items-center gap-2 mb-8 p-1 bg-muted/30 rounded-2xl w-fit border border-border/50">
                         {[
-                            { id: 'sessions', label: 'Scheduling & Materials', icon: <PlayCircle className="w-4 h-4" /> },
-                            { id: 'attendance', label: 'Attendance Management', icon: <CalendarCheck className="w-4 h-4" /> },
-                            { id: 'guidelines', label: 'Guidelines & Policies', icon: <Shield className="w-4 h-4" /> }
-                        ].map(tab => (
+                            { id: 'scheduling', label: 'Scheduling', icon: <PlayCircle className="w-4 h-4" /> },
+                            { id: 'attendance', label: 'Attendance', icon: <CalendarCheck className="w-4 h-4" /> },
+                            { id: 'resources', label: 'General Announcements & Resources', icon: <FileText className="w-4 h-4" /> },
+                            { id: 'guidelines', label: 'Guidelines & Policies', icon: <Shield className="w-4 h-4" />, hidden: manageBatch.is_finalized === 1 }
+                        ].filter(tab => !tab.hidden).map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setManageBatchTab(tab.id as any)}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                                    manageBatchTab === tab.id 
-                                    ? 'bg-background text-foreground shadow-sm border border-border/50' 
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
+                                    manageBatchTab === tab.id
+                                        ? "bg-background text-primary shadow-sm border border-border/50 scale-[1.02]"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                 }`}
                             >
                                 {tab.icon}
@@ -819,365 +917,489 @@ export default function InstructorDashboard() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-6">
-                            {manageBatchTab === 'sessions' && (
+                            {manageBatchTab === 'scheduling' && (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="glass-panel p-8 rounded-2xl border border-border bg-card relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl animate-pulse"></div>
-                                <div className="relative z-10">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                                        <div>
-                                            <h2 className="text-2xl font-bold text-foreground mb-1">Live Session Scheduling</h2>
-                                            <p className="text-sm text-muted-foreground">Update session link and timing for students.</p>
-                                        </div>
-                                        <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full border border-primary/20">
-                                            <PlayCircle className="w-5 h-5 text-primary" />
-                                            <span className="text-xs font-bold text-primary uppercase">{manageBatch.name}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-muted-foreground ml-1">Session Date</label>
-                                            <input
-                                                type="date"
-                                                disabled={!isManageInteractive}
-                                                value={sessionDates[manageBatch.id] || ""}
-                                                onChange={(e) => setSessionDates({ ...sessionDates, [manageBatch.id]: e.target.value })}
-                                                className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [color-scheme:light] dark:[color-scheme:dark] ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-muted-foreground ml-1">Session Timing</label>
-                                            <input
-                                                type="time"
-                                                disabled={!isManageInteractive}
-                                                value={sessionTimes[manageBatch.id] || ""}
-                                                onChange={(e) => setSessionTimes({ ...sessionTimes, [manageBatch.id]: e.target.value })}
-                                                className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [color-scheme:light] dark:[color-scheme:dark] ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between ml-1">
-                                                <label className="text-sm font-semibold text-muted-foreground">Session Link</label>
-                                                {!isManageInteractive && (
-                                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">{isManageRestricted ? 'Batch Concluded' : 'Finalization Pending'}</span>
-                                                )}
+                                    {/* Session Planning Form */}
+                                    <div className="glass-panel p-8 rounded-2xl border border-border bg-card shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10"></div>
+                                        <div className="relative z-10">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                                                <div>
+                                                    <h2 className="text-2xl font-bold text-foreground mb-1">Live Session Scheduling</h2>
+                                                    <p className="text-sm text-muted-foreground">Update session link and timing for students.</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full border border-primary/20">
+                                                    <PlayCircle className="w-5 h-5 text-primary" />
+                                                    <span className="text-xs font-bold text-primary uppercase">{manageBatch.name}</span>
+                                                </div>
                                             </div>
-                                            <input
-                                                type="url"
-                                                placeholder={isManageInteractive ? "https://meet.google.com/..." : isManageRestricted ? "Session Planning Closed" : "Disabled until finalized"}
-                                                value={sessionLinks[manageBatch.id] || ""}
-                                                onChange={(e) => setSessionLinks({ ...sessionLinks, [manageBatch.id]: e.target.value })}
-                                                disabled={!isManageInteractive}
-                                                className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${!isManageInteractive ? 'cursor-not-allowed opacity-50 grayscale' : ''
-                                                    }`}
-                                            />
-                                        </div>
-                                    </div>
 
-                                    <div className="space-y-2 mb-8">
-                                        <label className="text-sm font-semibold text-muted-foreground ml-1">Message to Students (Optional)</label>
-                                        <textarea
-                                            placeholder="Important notes for today's session..."
-                                            disabled={!isManageInteractive}
-                                            value={sessionMessage[manageBatch.id] || ""}
-                                            onChange={(e) => setSessionMessage({ ...sessionMessage, [manageBatch.id]: e.target.value })}
-                                            className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[100px] resize-none ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        />
-                                    </div>
-
-                                    {isManageInteractive && (
-                                        <div className="flex flex-col md:flex-row items-center gap-4">
-                                            <button
-                                                onClick={() => handlePlanSession(manageBatch.id)}
-                                                disabled={linkLoading[manageBatch.id]}
-                                                className="w-full md:w-auto px-10 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-xl font-black text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                                            >
-                                                {linkLoading[manageBatch.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                                                PLAN / ALTER SESSION & NOTIFY STUDENTS
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleSendManualReminder(manageBatch.id)}
-                                                disabled={reminderLoading[manageBatch.id] || !sessionLinks[manageBatch.id]}
-                                                className="w-full md:w-auto px-10 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                                            >
-                                                {reminderLoading[manageBatch.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Clock className="w-5 h-5" />}
-                                                SEND REMINDER EMAIL NOW
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Manual Reminders Note */}
-                            {isManageInteractive && (
-                                <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-3">
-                                    <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="text-xs font-bold text-foreground">Manual Reminders Enabled</p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            The automatic reminder system has been replaced with a manual button. Click <strong>SEND REMINDER EMAIL NOW</strong> above whenever you want to remind students about the session.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-                            {!isManageInteractive && !isManageRestricted && (
-                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
-                                    <Shield className="w-5 h-5 text-amber-500" />
-                                    <p className="text-xs text-amber-500 font-bold">Session planning is restricted until enrollment is finalized by admin.</p>
-                                </div>
-                            )}
-                            {isManageRestricted && (
-                                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-3">
-                                    <Shield className="w-5 h-5 text-rose-500" />
-                                    <p className="text-xs text-rose-500 font-bold">This batch is {manageBatch.batch_status}. Operations are locked.</p>
-                                </div>
-                            )}
-                                </div>
-                            )}
-
-                            {manageBatchTab === 'guidelines' && (
-                                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                            {/* Broadcast Guidelines / Pre-Course Announcements */}
-                            <div className={`glass-panel p-8 rounded-2xl border ${!manageBatch.is_finalized ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'} bg-card shadow-sm relative overflow-hidden`}>
-                                <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -z-10 ${!manageBatch.is_finalized ? 'bg-primary/10' : 'bg-amber-500/5'}`}></div>
-                                <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
-                                    {!manageBatch.is_finalized ? (
-                                        <><Shield className="w-5 h-5 text-primary animate-pulse" /> Pre-Course Announcements</>
-                                    ) : (
-                                        <><Shield className="w-5 h-5 text-amber-500" /> Broadcast Guidelines &amp; Policy</>
-                                    )}
-                                </h2>
-                                <p className="text-sm text-muted-foreground mb-6">
-                                    {!manageBatch.is_finalized 
-                                        ? "Welcome enrolled students, share prerequisite instructions, or specify software needed before the administration finalizes the roster."
-                                        : "Send guidelines or important messages visible on the student portal and/or via email."}
-                                </p>
-                                <div className="bg-muted/30 p-5 rounded-xl border border-border/50 space-y-4">
-                                    <textarea
-                                        placeholder={!manageBatch.is_finalized ? "Welcome to the upcoming course! Please ensure you have VS Code installed..." : "Enter guidelines or important instructions for students..."}
-                                        value={broadcastMessage}
-                                        onChange={(e) => setBroadcastMessage(e.target.value)}
-                                        disabled={isManageRestricted}
-                                        className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 ${!manageBatch.is_finalized ? 'focus:ring-primary/20 focus:border-primary' : 'focus:ring-amber-500/20 focus:border-amber-500'} transition-all min-h-[100px] resize-none text-sm ${isManageRestricted ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    />
-                                    <div className="flex flex-wrap items-center gap-5 py-3 border-y border-border/30">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Delivery:</span>
-                                        {(['both', 'portal', 'email'] as const).map(mode => (
-                                            <label key={mode} className="flex items-center gap-2 cursor-pointer group">
-                                                <input type="radio" name="broadcast_mode" value={mode} checked={broadcastMode === mode} onChange={(e) => setBroadcastMode(e.target.value as any)} className={`w-4 h-4 ${!manageBatch.is_finalized ? 'accent-primary' : 'accent-amber-500'}`} />
-                                                <span className={`text-xs font-bold text-foreground transition-colors capitalize ${!manageBatch.is_finalized ? 'group-hover:text-primary' : 'group-hover:text-amber-500'}`}>{mode === 'both' ? 'Portal & Email' : mode === 'portal' ? 'Portal Only' : 'Email Only'}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                    {!isManageRestricted && (
-                                        <button onClick={() => handleBroadcast(manageBatch.id)} disabled={broadcastLoading} className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 ${!manageBatch.is_finalized ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20' : 'bg-amber-500 text-amber-950 hover:bg-amber-600 shadow-lg shadow-amber-500/20'}`}>
-                                            {broadcastLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                            {!manageBatch.is_finalized ? 'ANNOUNCE NOW' : 'BROADCAST NOW'}
-                                        </button>
-                                    )}
-                                    {isManageRestricted && (
-                                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
-                                            <Shield className="w-4 h-4 text-rose-500" />
-                                            <p className="text-xs text-rose-500 font-bold">Batch {manageBatch.batch_status} — operations locked.</p>
-                                        </div>
-                                    )}
-                                    {manageBatch.broadcast_message && (
-                                        <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <CheckCircle className="w-4 h-4 text-amber-500" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Published on Portal</span>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between ml-1">
+                                                        <label className="text-sm font-semibold text-muted-foreground">Session Date</label>
+                                                        {isManageInteractive && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const dist = new Date(new Date().getTime() + 5.5 * 3600000).toISOString().split('T')[0];
+                                                                    setSessionDates({ ...sessionDates, [manageBatch.id]: dist });
+                                                                }}
+                                                                className="text-[10px] font-black uppercase tracking-tighter text-primary hover:underline"
+                                                            >
+                                                                Set to Today
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <input
+                                                        type="date"
+                                                        disabled={!isManageInteractive}
+                                                        value={sessionDates[manageBatch.id] || ""}
+                                                        onChange={(e) => setSessionDates({ ...sessionDates, [manageBatch.id]: e.target.value })}
+                                                        className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [color-scheme:light] dark:[color-scheme:dark] ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between ml-1">
+                                                        <label className="text-sm font-semibold text-muted-foreground">Session Timing</label>
+                                                        {isManageInteractive && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const tist = new Date(new Date().getTime() + 5.5 * 3600000).toISOString().split('T')[1].substring(0, 5);
+                                                                    setSessionTimes({ ...sessionTimes, [manageBatch.id]: tist });
+                                                                }}
+                                                                className="text-[10px] font-black uppercase tracking-tighter text-primary hover:underline"
+                                                            >
+                                                                Set to Now
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <input
+                                                        type="time"
+                                                        disabled={!isManageInteractive}
+                                                        value={sessionTimes[manageBatch.id] || ""}
+                                                        onChange={(e) => setSessionTimes({ ...sessionTimes, [manageBatch.id]: e.target.value })}
+                                                        className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all [color-scheme:light] dark:[color-scheme:dark] ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between ml-1">
+                                                        <label className="text-sm font-semibold text-muted-foreground">Session Link</label>
+                                                        {!isManageInteractive && (
+                                                            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">{isManageRestricted ? 'Batch Concluded' : 'Finalization Pending'}</span>
+                                                        )}
+                                                    </div>
+                                                    <input
+                                                        type="url"
+                                                        placeholder={isManageInteractive ? "https://meet.google.com/..." : isManageRestricted ? "Session Planning Closed" : "Disabled until finalized"}
+                                                        value={sessionLinks[manageBatch.id] || ""}
+                                                        onChange={(e) => setSessionLinks({ ...sessionLinks, [manageBatch.id]: e.target.value })}
+                                                        disabled={!isManageInteractive}
+                                                        className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${!isManageInteractive ? 'cursor-not-allowed opacity-50 grayscale' : ''
+                                                            }`}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <p className="text-xs text-foreground italic flex-1">"{manageBatch.broadcast_message}"</p>
-                                                <button onClick={() => handleDeleteBroadcast(manageBatch.id)} disabled={broadcastLoading} className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold uppercase">
-                                                    <XCircle className="w-3.5 h-3.5" /> Clear
-                                                </button>
+
+                                            <div className="space-y-2 mb-8">
+                                                <label className="text-sm font-semibold text-muted-foreground ml-1">Message to Students (Optional)</label>
+                                                <textarea
+                                                    placeholder="Important notes for today's session..."
+                                                    disabled={!isManageInteractive}
+                                                    value={sessionMessage[manageBatch.id] || ""}
+                                                    onChange={(e) => setSessionMessage({ ...sessionMessage, [manageBatch.id]: e.target.value })}
+                                                    className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[100px] resize-none ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                />
                                             </div>
+
+                                            {isManageInteractive && (
+                                                <div className="flex flex-col md:flex-row items-center gap-4">
+                                                    <button
+                                                        onClick={() => handlePlanSession(manageBatch.id)}
+                                                        disabled={linkLoading[manageBatch.id]}
+                                                        className="w-full md:w-auto px-10 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-xl font-black text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {linkLoading[manageBatch.id] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                                        SAVE & NOTIFY STUDENTS
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleSendManualReminder(manageBatch.id)}
+                                                        disabled={reminderLoading[manageBatch.id]}
+                                                        className="w-full md:w-auto px-8 py-4 bg-muted/50 hover:bg-muted text-foreground border border-border rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {reminderLoading[manageBatch.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                                                        SEND MANUAL REMINDER
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Upcoming Planned Session Details */}
+                                            {manageBatch.session_link && (
+                                                <div className="mt-8 p-6 rounded-2xl bg-primary/[0.03] border border-primary/10 relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                        <Clock className="w-12 h-12 text-primary" />
+                                                    </div>
+                                                    <div className="relative z-10">
+                                                        <div className="flex items-center gap-3 mb-4">
+                                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                            <h3 className="text-xs font-black uppercase tracking-widest text-primary">Currently Planned Session</h3>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            <div className="space-y-1">
+                                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Schedule</p>
+                                                                <p className="text-sm font-black text-foreground">
+                                                                    {manageBatch.session_date ? new Date(manageBatch.session_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                                                                    <span className="mx-2 text-primary opacity-50">@</span>
+                                                                    {formatTo12Hr(manageBatch.session_time)}
+                                                                </p>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Join Link</p>
+                                                                <a href={manageBatch.session_link} target="_blank" rel="noreferrer" className="text-sm font-bold text-primary hover:underline truncate block">
+                                                                    {manageBatch.session_link}
+                                                                </a>
+                                                            </div>
+                                                            {manageBatch.session_message && (
+                                                                <div className="md:col-span-2 space-y-1 mt-2">
+                                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Instructor Note</p>
+                                                                    <p className="text-xs text-foreground italic bg-background/50 p-3 rounded-lg border border-border/50">"{manageBatch.session_message}"</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="mt-6 pt-6 border-t border-border">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <BookOpen className="w-4 h-4 text-primary" />
-                                        <h3 className="text-sm font-bold text-foreground">Professional Guidance Tips</h3>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {[
-                                            { title: 'Clarify Verification', body: 'Reassure students that enrollment is manually verified by admin. Human verification ensures security and trust.' },
-                                            { title: 'UTR Accuracy', body: 'Guide students to double-check their Transaction ID (UTR). Incorrect IDs cause delays.' },
-                                            { title: 'Realistic Timelines', body: 'Inform students approvals typically take 24-48 hours. Clear expectations build institutional trust.' },
-                                            { title: 'Binary Approval', body: 'Only full payments are accepted. If a UTR is rejected, students can resubmit via their portal.' },
-                                        ].map(tip => (
-                                            <div key={tip.title} className="p-4 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-all">
-                                                <h4 className="text-xs font-bold text-primary mb-1 flex items-center gap-1.5"><CheckCircle className="w-3 h-3" />{tip.title}</h4>
-                                                <p className="text-[11px] leading-relaxed text-muted-foreground">{tip.body}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
                                 </div>
                             )}
 
-                            {manageBatchTab === 'sessions' && (
-                                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                            {/* Course Materials */}
-                            <div className="glass-panel p-8 rounded-2xl border border-border bg-card shadow-sm relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-bl-full -z-10"></div>
-                                <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-primary" />
-                                    Course Materials &amp; Announcements
-                                </h2>
-                                <p className="text-sm text-muted-foreground mb-6">Share resources and messages with enrolled students. Auto-deletes when batch completes.</p>
-                                <div className="bg-muted/30 p-5 rounded-xl border border-border/50 space-y-4">
-                                    <div className="space-y-1.5">
+                            {manageBatchTab === 'resources' && (
+                                <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
+                                    {/* Resource Broadcast Feed (Conversation UI) */}
+                                    <div className="space-y-8">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-sm font-semibold text-muted-foreground">Material Link (Drive, Dropbox…)</label>
-                                            {!isManageInteractive && <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">{isManageRestricted ? 'Restricted' : 'Pending Finalization'}</span>}
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                                    <FileText className="w-5 h-5 text-emerald-600" />
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-lg font-black text-foreground uppercase tracking-tight">Resource Channel</h2>
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Course Materials & Downloads</p>
+                                                </div>
+                                            </div>
+                                            {materials.length === 0 && (
+                                                <span className="px-3 py-1 rounded-full bg-muted text-[10px] font-bold text-muted-foreground uppercase tracking-wider border border-border/50">
+                                                    No assets published
+                                                </span>
+                                            )}
                                         </div>
-                                        <input type="url" placeholder={isManageInteractive ? 'https://drive.google.com/...' : isManageRestricted ? 'Materials Locked' : 'Enabled after finalization'}
-                                            value={materialLinks[manageBatch.id] || ''} onChange={(e) => setMaterialLinks({ ...materialLinks, [manageBatch.id]: e.target.value })} disabled={!isManageInteractive}
-                                            className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${!isManageInteractive ? 'cursor-not-allowed opacity-50 grayscale' : ''}`} />
+
+                                        <div className="space-y-6">
+                                            {/* Historical Broadcast Feed */}
+                                            {materials.length > 0 ? (
+                                                <div className="flex flex-col gap-8">
+                                                    {[...materials].reverse().map((item, idx) => (
+                                                        <div key={item.id} className="flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${idx * 50}ms` }}>
+                                                            <div className="flex items-start gap-3 w-full">
+                                                                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
+                                                                    <User className="w-4 h-4 text-primary" />
+                                                                </div>
+                                                                <div className="flex flex-col gap-1 flex-1 max-w-[95%] sm:max-w-[85%]">
+                                                                    <div className="bg-muted/40 backdrop-blur-sm border border-border/50 p-5 rounded-2xl rounded-tl-none shadow-sm space-y-4">
+                                                                        {item.message && (
+                                                                            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{item.message}</p>
+                                                                        )}
+                                                                        {item.link && (
+                                                                            <div className="p-3 bg-background/50 rounded-xl border border-border/30 flex items-center justify-between gap-4 group/file hover:border-primary/20 transition-all">
+                                                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                                                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                                                                        <Upload className="w-5 h-5 text-emerald-600 group-hover/file:scale-110 transition-transform" />
+                                                                                    </div>
+                                                                                    <div className="min-w-0">
+                                                                                        <p className="text-[9px] font-black truncate uppercase text-muted-foreground opacity-50">Instructor Resource</p>
+                                                                                        <p className="text-[10px] text-emerald-600 font-bold truncate">{item.link}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <a
+                                                                                    href={item.link}
+                                                                                    target="_blank"
+                                                                                    rel="noreferrer"
+                                                                                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-500 text-white flex items-center justify-center hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20 active:scale-90"
+                                                                                >
+                                                                                    <ArrowRight className="w-4 h-4" />
+                                                                                </a>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-3 px-1">
+                                                                        <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-50">
+                                                                            {new Date(item.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => handleDeleteMaterial(item.id, manageBatch.id)}
+                                                                            className="text-[9px] font-black text-rose-500/60 hover:text-rose-500 uppercase tracking-widest transition-colors flex items-center gap-1"
+                                                                        >
+                                                                            <Trash2 className="w-3 h-3" /> Remove
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 bg-muted/20 rounded-[2.5rem] border border-dashed border-border/60">
+                                                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                                        <FileText className="w-8 h-8 text-muted-foreground/30" />
+                                                    </div>
+                                                    <div className="max-w-[280px]">
+                                                        <h3 className="text-sm font-black text-foreground uppercase tracking-tight">No Resources Available</h3>
+                                                        <p className="text-xs text-muted-foreground leading-relaxed">Publish study materials, drive links, or session recordings for your students here.</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-semibold text-muted-foreground">Announcement or Message</label>
-                                        <textarea placeholder="Welcome to the course! Here are your initial materials..." disabled={!isManageInteractive} value={materialMessages[manageBatch.id] || ''}
-                                            onChange={(e) => setMaterialMessages({ ...materialMessages, [manageBatch.id]: e.target.value })}
-                                            className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[100px] resize-none ${!isManageInteractive ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                                    </div>
+
+                                    {/* Action Input */}
                                     {isManageInteractive && (
-                                        <button onClick={() => handleSaveMaterial(manageBatch.id)} disabled={materialLoading[manageBatch.id]} className="px-8 py-3 bg-primary hover:opacity-90 text-primary-foreground rounded-xl font-black text-sm transition-all shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 disabled:opacity-50">
-                                            {materialLoading[manageBatch.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                            SAVE &amp; PUBLISH MATERIALS
-                                        </button>
+                                        <div className="bg-card border border-border shadow-2xl rounded-3xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                                            <div className="flex items-center gap-2 px-1 mb-2">
+                                                <PenLine className="w-4 h-4 text-primary" />
+                                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Publish New Announcement</h3>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <textarea
+                                                    placeholder="Enter your message or instructions for the students..."
+                                                    value={materialMessages[manageBatch.id] || ''} 
+                                                    onChange={(e) => setMaterialMessages({ ...materialMessages, [manageBatch.id]: e.target.value })}
+                                                    className="w-full bg-muted/30 border border-border rounded-2xl px-5 py-4 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[120px] resize-none"
+                                                />
+                                                <div className="flex flex-col sm:flex-row gap-4">
+                                                    <div className="relative flex-1">
+                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                                            <Upload className="w-4 h-4 text-muted-foreground" />
+                                                        </div>
+                                                        <input 
+                                                            type="url" 
+                                                            placeholder="Paste Resource Link (Drive / Dropbox)"
+                                                            value={materialLinks[manageBatch.id] || ''} 
+                                                            onChange={(e) => setMaterialLinks({ ...materialLinks, [manageBatch.id]: e.target.value })}
+                                                            className="w-full bg-muted/30 border border-border rounded-xl pl-12 pr-4 py-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" 
+                                                        />
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleSaveMaterial(manageBatch.id)}
+                                                        disabled={materialLoading[manageBatch.id]}
+                                                        className="px-10 py-3.5 bg-primary text-primary-foreground rounded-xl font-black text-sm transition-all shadow-xl shadow-primary/20 hover:opacity-90 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shrink-0"
+                                                    >
+                                                        {materialLoading[manageBatch.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                                        BROADCAST
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
+
                                     {!isManageInteractive && !isManageRestricted && (
-                                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2"><Shield className="w-4 h-4 text-amber-500" /><p className="text-xs text-amber-500 font-bold">Material sharing enabled after finalization.</p></div>
+                                        <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                                <Shield className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <p className="text-xs text-amber-600 font-bold">This batch is currently awaiting admission finalization. Resource sharing will be enabled after the roster is locked.</p>
+                                        </div>
                                     )}
+
                                     {isManageRestricted && (
-                                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2"><Shield className="w-4 h-4 text-rose-500" /><p className="text-xs text-rose-500 font-bold">Batch {manageBatch.batch_status} — locked.</p></div>
+                                        <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                                                <XCircle className="w-4 h-4 text-rose-500" />
+                                            </div>
+                                            <p className="text-xs text-rose-500 font-bold">Batch Concluded. Historical resources are locked for archival purposes.</p>
+                                        </div>
                                     )}
-                                </div>
-                            </div>
                                 </div>
                             )}
 
                             {manageBatchTab === 'attendance' && (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                            {/* Past Attendance Dates */}
-                            {pastAttendanceDates.length > 0 && (
-                                <div className="glass-panel p-6 rounded-2xl border border-border bg-card shadow-sm">
-                                    <h2 className="text-base font-bold text-foreground mb-1">Past Attendance Records</h2>
-                                    <p className="text-xs text-muted-foreground mb-4">Click any date to view or edit that day&apos;s attendance below.</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {pastAttendanceDates.map(date => (
-                                            <button key={date} onClick={() => { setAttendanceDate(date); document.getElementById('mark-attendance-section')?.scrollIntoView({ behavior: 'smooth' }); }}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${attendanceDate === date ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20' : 'bg-muted/50 hover:bg-muted border-border text-foreground hover:border-primary/50'}`}>
-                                                {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {/* Past Attendance Dates */}
+                                    {pastAttendanceDates.length > 0 && (
+                                        <div className="glass-panel p-6 rounded-2xl border border-border bg-card shadow-sm">
+                                            <h2 className="text-base font-bold text-foreground mb-1">Past Attendance Records</h2>
+                                            <p className="text-xs text-muted-foreground mb-4">Click any date to view or edit that day&apos;s attendance below.</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {pastAttendanceDates.map(date => (
+                                                    <button key={date} onClick={() => { setAttendanceDate(date); document.getElementById('mark-attendance-section')?.scrollIntoView({ behavior: 'smooth' }); }}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${attendanceDate === date ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20' : 'bg-muted/50 hover:bg-muted border-border text-foreground hover:border-primary/50'}`}>
+                                                        {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Mark Attendance */}
+                                    <div id="mark-attendance-section" className="glass-panel p-8 rounded-2xl border border-border bg-card">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                                            <div>
+                                                <h2 className="text-2xl font-bold text-foreground mb-1">Mark Attendance</h2>
+                                                <p className="text-sm text-muted-foreground">Record student presence for the selected date.</p>
+                                            </div>
+                                            <input
+                                                type="date"
+                                                value={attendanceDate}
+                                                onChange={(e) => setAttendanceDate(e.target.value)}
+                                                className="px-5 py-3 bg-muted border border-border rounded-xl text-foreground font-bold [color-scheme:light] dark:[color-scheme:dark] shadow-sm focus:outline-none focus:border-primary transition-colors"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {studentsLoading ? (
+                                                <div className="flex justify-center py-12"><Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" /></div>
+                                            ) : students.length > 0 ? students.map(s => (
+                                                <div key={s.id} className="p-4 rounded-2xl bg-muted/40 border border-border flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-muted/60 transition-all">
+                                                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                                                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                            {s.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-foreground text-sm">{s.name}</h4>
+                                                            <span className="text-xs text-muted-foreground">{s.email}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2 w-full sm:w-auto">
+                                                        <button
+                                                            onClick={() => !manageBatch.is_finalized ? alert("Cannot mark attendance until finalized") : toggleStudentStatus(s.id, 'present')}
+                                                            disabled={!manageBatch.is_finalized}
+                                                            className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border-2 ${attendanceRecords[s.id] === 'present'
+                                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                                                : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted'
+                                                                } ${!manageBatch.is_finalized ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            <Check className="w-4 h-4" /> PRESENT
+                                                        </button>
+                                                        <button
+                                                            onClick={() => !manageBatch.is_finalized ? alert("Cannot mark attendance until finalized") : toggleStudentStatus(s.id, 'absent')}
+                                                            disabled={!manageBatch.is_finalized}
+                                                            className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border-2 ${attendanceRecords[s.id] === 'absent'
+                                                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                                                                : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted'
+                                                                } ${!manageBatch.is_finalized ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        >
+                                                            <XCircle className="w-4 h-4" /> ABSENT
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )) : (
+                                                <div className="py-20 flex flex-col items-center justify-center text-muted-foreground text-sm opacity-40">
+                                                    <Users className="w-16 h-16 mb-4" />
+                                                    <p className="font-bold">No students currently enrolled in this batch.</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-8 pt-8 border-t border-border">
+                                            {(!manageBatch.is_finalized || !isManageInteractive || (pastAttendanceDates.length >= manageBatch.duration_days && !pastAttendanceDates.includes(attendanceDate))) && (
+                                                <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+                                                    <Shield className="w-4 h-4 text-rose-500 shrink-0" />
+                                                    <p className="text-xs text-rose-500 font-bold">
+                                                        {!manageBatch.is_finalized ? 'Attendance locked until admin finalizes enrollment.' :
+                                                            !isManageInteractive ? `Batch is ${manageBatch.batch_status}. Operations locked.` :
+                                                            'Max duration reached. Cannot add new attendance dates.'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={submitAttendance}
+                                                disabled={markingLoading || students.length === 0 || !manageBatch.is_finalized || !isManageInteractive || (pastAttendanceDates.length >= manageBatch.duration_days && !pastAttendanceDates.includes(attendanceDate))}
+                                                className="w-full mb-4 py-5 bg-foreground text-background dark:bg-primary dark:text-primary-foreground hover:opacity-90 rounded-2xl font-black text-base flex items-center justify-center gap-3 disabled:opacity-50 shadow-2xl transition-all active:scale-95"
+                                            >
+                                                {markingLoading ? (
+                                                    <Loader2 className="w-6 h-6 animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <CalendarCheck className="w-5 h-5" /> 
+                                                        {pastAttendanceDates.includes(attendanceDate) ? 'UPDATE SAVED ATTENDANCE' : 'SAVE DAILY ATTENDANCE'}
+                                                    </>
+                                                )}
                                             </button>
-                                        ))}
+
+                                            {isManageInteractive && pastAttendanceDates.length >= manageBatch.duration_days && (
+                                                <button
+                                                    onClick={() => handleFinalizeCourse(manageBatch.id)}
+                                                    className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-base flex items-center justify-center gap-3 shadow-2xl transition-all active:scale-95 animate-pulse"
+                                                >
+                                                    <Shield className="w-5 h-5" /> SUBMIT FINAL ATTENDANCE & COMPLETE COURSE
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Mark Attendance */}
-                            <div id="mark-attendance-section" className="glass-panel p-8 rounded-2xl border border-border bg-card">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-foreground mb-1">Mark Attendance</h2>
-                                        <p className="text-sm text-muted-foreground">Record student presence for the selected date.</p>
+                            {manageBatchTab === 'guidelines' && (
+                                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                                    {/* Broadcast Guidelines / Pre-Course Announcements */}
+                                    <div className={`glass-panel p-8 rounded-2xl border ${!manageBatch.is_finalized ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border'} bg-card shadow-sm relative overflow-hidden`}>
+                                        <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -z-10 ${!manageBatch.is_finalized ? 'bg-primary/10' : 'bg-amber-500/5'}`}></div>
+                                        <h2 className="text-xl font-bold text-foreground mb-1 flex items-center gap-2">
+                                            {!manageBatch.is_finalized ? (
+                                                <><Shield className="w-5 h-5 text-primary animate-pulse" /> Pre-Course Announcements</>
+                                            ) : (
+                                                <><Shield className="w-5 h-5 text-amber-500" /> Broadcast Guidelines &amp; Policy</>
+                                            )}
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground mb-6">
+                                            {!manageBatch.is_finalized 
+                                                ? "Welcome enrolled students, share prerequisite instructions, or specify software needed before the administration finalizes the roster."
+                                                : "Send guidelines or important messages visible on the student portal and/or via email."}
+                                        </p>
+                                        <div className="bg-muted/30 p-5 rounded-xl border border-border/50 space-y-4">
+                                            <textarea
+                                                placeholder={!manageBatch.is_finalized ? "Welcome to the upcoming course! Please ensure you have VS Code installed..." : "Enter guidelines or important instructions for students..."}
+                                                value={broadcastMessage}
+                                                onChange={(e) => setBroadcastMessage(e.target.value)}
+                                                disabled={isManageRestricted}
+                                                className={`w-full bg-muted/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 ${!manageBatch.is_finalized ? 'focus:ring-primary/20 focus:border-primary' : 'focus:ring-amber-500/20 focus:border-amber-500'} transition-all min-h-[100px] resize-none text-sm ${isManageRestricted ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            />
+                                            <div className="flex flex-wrap items-center gap-5 py-3 border-y border-border/30">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Delivery:</span>
+                                                {(['both', 'portal', 'email'] as const).map(mode => (
+                                                    <label key={mode} className="flex items-center gap-2 cursor-pointer group">
+                                                        <input type="radio" name="broadcast_mode" value={mode} checked={broadcastMode === mode} onChange={(e) => setBroadcastMode(e.target.value as any)} className={`w-4 h-4 ${!manageBatch.is_finalized ? 'accent-primary' : 'accent-amber-500'}`} />
+                                                        <span className={`text-xs font-bold text-foreground transition-colors capitalize ${!manageBatch.is_finalized ? 'group-hover:text-primary' : 'group-hover:text-amber-500'}`}>{mode === 'both' ? 'Portal & Email' : mode === 'portal' ? 'Portal Only' : 'Email Only'}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            {!isManageRestricted && (
+                                                <button onClick={() => handleBroadcast(manageBatch.id)} disabled={broadcastLoading} className={`px-8 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 ${!manageBatch.is_finalized ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20' : 'bg-amber-500 text-amber-950 hover:bg-amber-600 shadow-lg shadow-amber-500/20'}`}>
+                                                    {broadcastLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                                    {!manageBatch.is_finalized ? 'ANNOUNCE NOW' : 'BROADCAST NOW'}
+                                                </button>
+                                            )}
+                                            {isManageRestricted && (
+                                                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+                                                    <Shield className="w-4 h-4 text-rose-500" />
+                                                    <p className="text-xs text-rose-500 font-bold">Batch {manageBatch.batch_status} — operations locked.</p>
+                                                </div>
+                                            )}
+                                            {manageBatch.broadcast_message && (
+                                                <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <CheckCircle className="w-4 h-4 text-amber-500" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Published on Portal</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <p className="text-xs text-foreground italic flex-1">"{manageBatch.broadcast_message}"</p>
+                                                        <button onClick={() => handleDeleteBroadcast(manageBatch.id)} disabled={broadcastLoading} className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold uppercase">
+                                                            <XCircle className="w-3.5 h-3.5" /> Clear
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <input
-                                        type="date"
-                                        value={attendanceDate}
-                                        onChange={(e) => setAttendanceDate(e.target.value)}
-                                        className="px-5 py-3 bg-muted border border-border rounded-xl text-foreground font-bold [color-scheme:light] dark:[color-scheme:dark] shadow-sm focus:outline-none focus:border-primary transition-colors"
-                                    />
-                                </div>
-
-                                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {studentsLoading ? (
-                                        <div className="flex justify-center py-12"><Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" /></div>
-                                    ) : students.length > 0 ? students.map(s => (
-                                        <div key={s.id} className="p-4 rounded-2xl bg-muted/40 border border-border flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-muted/60 transition-all">
-                                            <div className="flex items-center gap-4 w-full sm:w-auto">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {s.name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-foreground text-sm">{s.name}</h4>
-                                                    <span className="text-xs text-muted-foreground">{s.email}</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2 w-full sm:w-auto">
-                                                <button
-                                                    onClick={() => !manageBatch.is_finalized ? alert("Cannot mark attendance until finalized") : toggleStudentStatus(s.id, 'present')}
-                                                    disabled={!manageBatch.is_finalized}
-                                                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border-2 ${attendanceRecords[s.id] === 'present'
-                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                                        : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted'
-                                                        } ${!manageBatch.is_finalized ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                >
-                                                    <Check className="w-4 h-4" /> PRESENT
-                                                </button>
-                                                <button
-                                                    onClick={() => !manageBatch.is_finalized ? alert("Cannot mark attendance until finalized") : toggleStudentStatus(s.id, 'absent')}
-                                                    disabled={!manageBatch.is_finalized}
-                                                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border-2 ${attendanceRecords[s.id] === 'absent'
-                                                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                                                        : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted'
-                                                        } ${!manageBatch.is_finalized ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                >
-                                                    <XCircle className="w-4 h-4" /> ABSENT
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )) : (
-                                        <div className="py-20 flex flex-col items-center justify-center text-muted-foreground text-sm opacity-40">
-                                            <Users className="w-16 h-16 mb-4" />
-                                            <p className="font-bold">No students currently enrolled in this batch.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-8 pt-8 border-t border-border">
-                                    {(!manageBatch.is_finalized || !isManageInteractive || (pastAttendanceDates.length >= manageBatch.duration_days && !pastAttendanceDates.includes(attendanceDate))) && (
-                                        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
-                                            <Shield className="w-4 h-4 text-rose-500 shrink-0" />
-                                            <p className="text-xs text-rose-500 font-bold">
-                                                {!manageBatch.is_finalized ? 'Attendance locked until admin finalizes enrollment.' :
-                                                    !isManageInteractive ? `Batch is ${manageBatch.batch_status}. Operations locked.` :
-                                                    'Max duration reached. Cannot add new attendance dates.'}
-                                            </p>
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={submitAttendance}
-                                        disabled={markingLoading || students.length === 0 || !manageBatch.is_finalized || !isManageInteractive || (pastAttendanceDates.length >= manageBatch.duration_days && !pastAttendanceDates.includes(attendanceDate))}
-                                        className="w-full mb-4 py-5 bg-foreground text-background dark:bg-primary dark:text-primary-foreground hover:opacity-90 rounded-2xl font-black text-base flex items-center justify-center gap-3 disabled:opacity-50 shadow-2xl transition-all active:scale-95"
-                                    >
-                                        {markingLoading ? (
-                                            <Loader2 className="w-6 h-6 animate-spin" />
-                                        ) : (
-                                            <>
-                                                <CalendarCheck className="w-5 h-5" /> 
-                                                {pastAttendanceDates.includes(attendanceDate) ? 'UPDATE SAVED ATTENDANCE' : 'SAVE DAILY ATTENDANCE'}
-                                            </>
-                                        )}
-                                    </button>
-
-                                    {isManageInteractive && pastAttendanceDates.length >= manageBatch.duration_days && (
-                                        <button
-                                            onClick={() => handleFinalizeCourse(manageBatch.id)}
-                                            className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-base flex items-center justify-center gap-3 shadow-2xl transition-all active:scale-95 animate-pulse"
-                                        >
-                                            <Shield className="w-5 h-5" /> SUBMIT FINAL ATTENDANCE & COMPLETE COURSE
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
                                 </div>
                             )}
                         </div>
@@ -1575,7 +1797,14 @@ export default function InstructorDashboard() {
                                     <div key={s.id} className="p-3 rounded-xl bg-muted/50 border border-border flex items-center justify-between hover:bg-muted transition-colors">
                                         <div>
                                             <h4 className="font-medium text-foreground text-sm">{s.name}</h4>
-                                            <span className="text-xs text-muted-foreground">{s.email}</span>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs text-muted-foreground">{s.email}</span>
+                                                {s.phone && (
+                                                    <span className="text-[10px] text-primary/60 font-bold flex items-center gap-1">
+                                                        <Phone className="w-2.5 h-2.5" /> {s.phone}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <button

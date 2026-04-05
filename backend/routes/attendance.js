@@ -72,6 +72,15 @@ router.post('/batch/:batch_id', authenticateToken, requireRole('instructor'), as
 
         await connection.commit();
 
+        // Check if attendance duration target is reached
+        const [statsRows] = await connection.execute(`SELECT COUNT(DISTINCT date) as c FROM attendance WHERE batch_id = ?`, [batch_id]);
+        const [bInfoRows] = await connection.execute(`SELECT duration_days FROM batches WHERE id = ?`, [batch_id]);
+        
+        if (statsRows[0] && bInfoRows[0] && statsRows[0].c >= bInfoRows[0].duration_days) {
+            await connection.execute(`UPDATE batches SET attendance_completed = 1 WHERE id = ?`, [batch_id]);
+            console.log(`[SYSTEM] Batch ${batch_id} marked as attendance_completed.`);
+        }
+
         res.json({ message: 'Attendance records updated successfully' });
     } catch (err) {
         if (connection) await connection.rollback();

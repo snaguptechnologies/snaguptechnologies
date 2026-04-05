@@ -13,8 +13,12 @@ app.use(helmet()); // Set various security headers
 // Rate limiting for auth routes
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 requests per windowMs
-    message: { error: "Too many login attempts. Please try again later." }
+    max: 50, // 50 attempts per 15 min per IP (reasonable for dev + production)
+    standardHeaders: true,    // Return rate limit info in RateLimit-* headers
+    legacyHeaders: false,     // Disable X-RateLimit-* headers
+    handler: (req, res) => {
+        res.status(429).json({ error: "Too many login attempts. Please wait 15 minutes and try again." });
+    }
 });
 app.use('/api/auth/login', authLimiter);
 

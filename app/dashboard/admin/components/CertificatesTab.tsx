@@ -5,8 +5,9 @@ import { BACKEND_URL } from '@/app/lib/api';
 import { 
     Award, Search, Download, Trash2, 
     Calendar, Filter, User, BookOpen, 
-    FileText, ExternalLink, RefreshCw, X 
+    FileText, ExternalLink, RefreshCw, X, Table 
 } from 'lucide-react';
+import { exportToExcel, formatCertificateExport } from '../lib/excelUtils';
 
 interface CertificatesTabProps {
     certificates: any[];
@@ -18,6 +19,9 @@ interface CertificatesTabProps {
     tabLoading: boolean;
     handleDeleteCertificate: (id: number) => void;
     courses: any[];
+    batches?: any[];
+    certBatchFilter?: string;
+    setCertBatchFilter?: (val: string) => void;
 }
 
 const CertificatesTab: React.FC<CertificatesTabProps> = ({
@@ -27,9 +31,12 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
     setCertSearch,
     certCourseFilter,
     setCertCourseFilter,
+    certBatchFilter = "all",
+    setCertBatchFilter = () => {},
     tabLoading,
     handleDeleteCertificate,
-    courses
+    courses,
+    batches = []
 }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
@@ -44,6 +51,12 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
     });
 
     const uniqueCourses = Array.from(new Set(certificates.map(c => c.course_name)));
+    const uniqueBatches = Array.from(new Set(certificates.map(c => c.batch_name)));
+
+    const handleExport = () => {
+        const formattedData = formatCertificateExport(finalFiltered);
+        exportToExcel(formattedData, 'Certificates_Records');
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
@@ -66,11 +79,15 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                         <div className="w-px h-8 bg-primary/20" />
                         <Award className="w-6 h-6 text-primary animate-pulse" />
                     </div>
+                    <button onClick={handleExport} className="px-5 py-3.5 bg-foreground text-background border border-border/50 rounded-2xl flex items-center gap-2 hover:-translate-y-1 hover:shadow-xl transition-all font-black uppercase tracking-widest text-[10px]">
+                        <Table className="w-4 h-4" />
+                        Export XL
+                    </button>
                 </div>
             </div>
 
             {/* Filters Rack */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 glass-panel rounded-[2rem] border border-border/50 bg-card/30 backdrop-blur-xl">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 glass-panel rounded-[2rem] border border-border/50 bg-card/30 backdrop-blur-xl">
                 {/* Search */}
                 <div className="relative group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -93,7 +110,22 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                     >
                         <option value="all">All Courses</option>
                         {uniqueCourses.map(course => (
-                            <option key={course} value={course}>{course}</option>
+                            <option key={`course-${course}`} value={course as string}>{course as string}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Batch Filter */}
+                <div className="relative">
+                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <select 
+                        value={certBatchFilter}
+                        onChange={(e) => setCertBatchFilter(e.target.value)}
+                        className="w-full bg-background/50 border border-border/50 rounded-xl pl-11 pr-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none transition-all cursor-pointer"
+                    >
+                        <option value="all">All Batches</option>
+                        {uniqueBatches.map(batch => (
+                            <option key={`batch-${batch}`} value={batch as string}>{batch as string}</option>
                         ))}
                     </select>
                 </div>
@@ -203,9 +235,9 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                                             <FileText className="w-16 h-16 text-muted-foreground mb-2" />
                                             <h3 className="text-lg font-bold">No Certificate Records Found</h3>
                                             <p className="text-[10px] font-black uppercase tracking-widest max-w-[240px]">Refine your search or date filters to locate specific credentials.</p>
-                                            {(certSearch || certCourseFilter !== 'all' || startDate || endDate) && (
+                                            {(certSearch || certCourseFilter !== 'all' || certBatchFilter !== 'all' || startDate || endDate) && (
                                                 <button 
-                                                    onClick={() => { setCertSearch(""); setCertCourseFilter("all"); setStartDate(""); setEndDate(""); }}
+                                                    onClick={() => { setCertSearch(""); setCertCourseFilter("all"); setCertBatchFilter("all"); setStartDate(""); setEndDate(""); }}
                                                     className="mt-4 px-6 py-2 bg-muted rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all"
                                                 >
                                                     Clear All Filters
