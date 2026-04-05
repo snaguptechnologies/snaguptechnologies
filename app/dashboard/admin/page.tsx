@@ -60,7 +60,7 @@ export default function AdminDashboard() {
         handleSaveGeneralSettings, handleUpdateDeadline, showToast, fetchAttendanceData, 
         handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, 
-        handleBulkEnrollmentAction,
+        handleBulkEnrollmentAction, handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings, 
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch, handleDeleteUser, 
         handleOfficialClose, handleGenerateCert, openEnrollmentsModal, openCertModal, 
@@ -442,6 +442,7 @@ export default function AdminDashboard() {
                                     onBack={setActiveTab as any}
                                     previousTab={previousTab}
                                     mode={activeTab === 'settings' ? 'profile' : 'system'}
+                                    handleResetDatabase={handleResetDatabase}
                                 />
                             )}
 

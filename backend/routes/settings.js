@@ -65,5 +65,32 @@ router.put('/', authenticateToken, requireRole('admin'), async (req, res) => {
         if (connection) connection.release();
     }
 });
+// POST /api/settings/reset-database - admin only, destructive
+router.post('/reset-database', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const tables = [
+            'certificates', 'batch_materials', 'waitlist', 'enrollments', 
+            'attendance', 'batches', 'courses', 'inquiries', 'email_logs', 'settings', 'users'
+        ];
+        
+        // Drop all tables
+        for (const table of tables) {
+            await db.execute(`DROP TABLE IF EXISTS ${table}`);
+        }
+        
+        // Re-initialize tables and admin account
+        if (typeof db.initializeDatabase === 'function') {
+            await db.initializeDatabase();
+        } else {
+            throw new Error("initializeDatabase function not exported from db object");
+        }
+        
+        console.log(`[ADMIN] Factory Reset performed by user: ${req.user.email}`);
+        res.json({ message: 'Database wiped and factory reset successfully.' });
+    } catch (err) {
+        console.error("❌ Failed to reset database:", err);
+        res.status(500).json({ error: 'Failed to reset the database completely' });
+    }
+});
 
 module.exports = router;

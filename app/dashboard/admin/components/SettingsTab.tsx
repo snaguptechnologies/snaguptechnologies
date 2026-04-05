@@ -32,6 +32,7 @@ interface SettingsTabProps {
     previousTab: string;
     onBack: (tab: string) => void;
     mode: 'profile' | 'system';
+    handleResetDatabase: () => void;
 }
 
 const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -64,7 +65,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     handleChangePassword,
     previousTab,
     onBack,
-    mode
+    mode,
+    handleResetDatabase
 }) => {
     const getTabLabel = (id: string) => {
         const labels: Record<string, string> = {
@@ -227,6 +229,27 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                             {genSaving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" strokeWidth={3} /> : "Save System Changes"}
                                         </button>
                                     </form>
+
+                                    {/* Danger Zone */}
+                                    <div className="mt-12 pt-8 border-t border-border">
+                                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-6 md:p-8 bg-rose-500/5 rounded-[2rem] border border-rose-500/20">
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-black text-rose-500 mb-2 flex items-center gap-2">
+                                                    <Trash2 className="w-5 h-5" /> Danger Zone
+                                                </h3>
+                                                <p className="text-xs text-rose-500/80 font-medium">
+                                                    Permanently wipe the entire database. This action drops all records, enrollments, users, and certificates immediately. The system will auto-rebuild fresh empty tables.
+                                                </p>
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={handleResetDatabase}
+                                                className="w-full md:w-auto px-8 py-4 bg-rose-500 text-white hover:bg-rose-600 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20 whitespace-nowrap shrink-0"
+                                            >
+                                                Factory Reset System
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}

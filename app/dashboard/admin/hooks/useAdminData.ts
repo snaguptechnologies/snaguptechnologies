@@ -622,6 +622,29 @@ export const useAdminData = () => {
         }
     };
 
+    const handleResetDatabase = async () => {
+        const text = prompt("DANGER ZONE: This will wipe ALL database tables permanently, including users, courses, and certificates.\n\nType 'RESET' to confirm this action:");
+        if (text !== 'RESET') {
+            alert("Database reset cancelled.");
+            return;
+        }
+
+        const confirmAgain = confirm("FINAL WARNING: Are you absolutely sure? This action CANNOT be undone.");
+        if (!confirmAgain) return;
+
+        setSettingsLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.post(`${API_ENDPOINTS.SETTINGS}/reset-database`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            handleLogout(); // Force logout as users have been wiped
+        } catch (err: any) {
+            showToast("Failed to reset database", "error");
+            setSettingsLoading(false);
+        }
+    };
+
     const handleUpdateDeadline = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedBatchForDeadline) return;
@@ -1179,6 +1202,7 @@ export const useAdminData = () => {
         handleUpdateDeadline, showToast, fetchAttendanceData,
         handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, handleBulkEnrollmentAction,
+        handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings,
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch,
         handleDeleteUser, handleOfficialClose, handleGenerateCert, openEnrollmentsModal,

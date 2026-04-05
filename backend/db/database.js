@@ -274,5 +274,6 @@ async function initializeDatabase() {
 
 const dbReady = initializeDatabase();
 pool.dbReady = dbReady;
+pool.initializeDatabase = initializeDatabase;
 
 module.exports = pool;
