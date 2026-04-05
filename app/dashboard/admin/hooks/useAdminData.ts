@@ -1149,16 +1149,7 @@ export const useAdminData = () => {
         }
     };
 
-    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
-            setGeneralSettings(prev => ({ ...prev, site_logo: base64String }));
-        };
-        reader.readAsDataURL(file);
-    };
+
 
     const handleExport = (type: 'students' | 'payments' | 'attendance' | 'certificates' | 'financials' | 'dashboard_graph') => {
         try {
