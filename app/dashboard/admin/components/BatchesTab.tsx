@@ -32,7 +32,7 @@ interface BatchesTabProps {
     setEditBatchForm: (form: any) => void;
     setShowEditBatchModal: (show: boolean) => void;
     handleDeleteBatch: (id: number) => void;
-    handleBulkBatchUpdate: (ids: number[], action: 'active' | 'archived') => void;
+    handleBulkBatchUpdate: (ids: number[], action: 'open_enrollment' | 'close_enrollment' | 'end_batch') => void;
     bulkLoading: boolean;
     getLocalDatetime: () => { enrollment_date: string; enrollment_time: string };
 }
@@ -331,21 +331,21 @@ const BatchesTab: React.FC<BatchesTabProps> = ({
                     <div className="flex items-center gap-3">
                         <button
                             disabled={bulkLoading}
-                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'active')}
+                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'open_enrollment')}
                             className="px-6 py-2.5 bg-background text-foreground rounded-2xl text-[10px] font-black hover:bg-white transition-all uppercase tracking-widest disabled:opacity-50"
                         >
                             Open Enrollment
                         </button>
                         <button
                             disabled={bulkLoading}
-                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'archived')}
+                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'close_enrollment')}
                             className="px-6 py-2.5 bg-background/10 text-background border border-background/20 rounded-2xl text-[10px] font-black hover:bg-background/20 transition-all uppercase tracking-widest disabled:opacity-50"
                         >
                             Close Enrollment
                         </button>
                         <button
                             disabled={bulkLoading}
-                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'archived')}
+                            onClick={() => handleBulkBatchUpdate(selectedBatches, 'end_batch')}
                             className="px-6 py-2.5 bg-rose-500 text-white rounded-2xl text-[10px] font-black hover:bg-rose-600 transition-all uppercase tracking-widest disabled:opacity-50"
                         >
                             End Batches

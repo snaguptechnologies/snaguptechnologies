@@ -898,7 +898,7 @@ export const useAdminData = () => {
         }
     };
 
-    const handleBulkBatchUpdate = async (ids: number[], action: 'active' | 'archived') => {
+    const handleBulkBatchUpdate = async (ids: number[], action: 'open_enrollment' | 'close_enrollment' | 'end_batch') => {
         if (!ids || ids.length === 0) return;
         setBulkLoading(true);
         try {

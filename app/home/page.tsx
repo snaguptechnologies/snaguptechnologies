@@ -512,7 +512,7 @@ export default function HomePage() {
                                                             <p className="text-sm font-black text-foreground">{batch.duration_days} Days</p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-1">Next Sync</p>
+                                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-1">Enrollment Deadline</p>
                                                             <p className="text-sm font-black text-foreground">
                                                                 {batch.enrollment_end_date ? new Date(batch.enrollment_end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'TBA'}
                                                             </p>
