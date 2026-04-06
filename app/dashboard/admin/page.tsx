@@ -44,6 +44,7 @@ export default function AdminDashboard() {
         studentSearch, setStudentSearch, attCourseId, setAttCourseId, attBatchId, setAttBatchId, 
         attendanceData, attLoading, showCourseModal, setShowCourseModal, showBatchModal, 
         setShowBatchModal, showEditBatchModal, setShowEditBatchModal, editBatchForm, setEditBatchForm, 
+        showEditCourseModal, setShowEditCourseModal, editCourseForm, setEditCourseForm,
         selectedBatches, bulkLoading, showEnrollmentModal, setShowEnrollmentModal, 
         showCertModal, setShowCertModal, showInstructorModal, setShowInstructorModal, 
         showEditDeadlineModal, setShowEditDeadlineModal, selectedBatchForDeadline, 
@@ -58,7 +59,7 @@ export default function AdminDashboard() {
         selectedPayments, setSelectedPayments, rejectionModal, setRejectionModal,
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, 
         handleSaveGeneralSettings, handleUpdateDeadline, showToast, fetchAttendanceData, 
-        handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
+        handleCreateCourse, handleEditCourseSubmit, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, 
         handleBulkEnrollmentAction, handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings, 
@@ -300,6 +301,8 @@ export default function AdminDashboard() {
                                     tabLoading={tabLoading}
                                     setShowCourseModal={setShowCourseModal}
                                     handleDeleteCourse={handleDeleteCourse}
+                                    setShowEditCourseModal={setShowEditCourseModal}
+                                    setEditCourseForm={setEditCourseForm}
                                 />
                             )}
 

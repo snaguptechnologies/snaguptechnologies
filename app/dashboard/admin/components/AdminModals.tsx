@@ -23,6 +23,8 @@ interface AdminModalsProps {
     setShowCertModal: (show: boolean) => void;
     showEditDeadlineModal: boolean;
     setShowEditDeadlineModal: (show: boolean) => void;
+    showEditCourseModal: boolean;
+    setShowEditCourseModal: (show: boolean) => void;
 
     // Forms
     courseForm: any;
@@ -35,6 +37,8 @@ interface AdminModalsProps {
     setEditBatchForm: (form: any) => void;
     editDeadlineForm: any;
     setEditDeadlineForm: (form: any) => void;
+    editCourseForm: any;
+    setEditCourseForm: (form: any) => void;
     showInstPassword: boolean;
     setShowInstPassword: (show: boolean) => void;
 
@@ -54,6 +58,7 @@ interface AdminModalsProps {
     handleEnrollmentAction: (id: number, status: 'approved' | 'rejected', category: 'full' | 'invalid') => void;
     handleGenerateCert: (studentId: number, batchId: number) => void;
     handleUpdateDeadline: (e: React.FormEvent) => void;
+    handleEditCourseSubmit: (e: React.FormEvent) => void;
     showToast: (msg: string, type: any) => void;
     formLoading: boolean;
 }
@@ -77,7 +82,9 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
         approvedEnrollments, selectedBatchForDeadline,
         handleCreateCourse, handleCreateInstructor, handleCreateBatch,
         handleEditBatchSubmit, handleEnrollmentAction, handleGenerateCert,
-        handleUpdateDeadline, showToast, formLoading
+        handleUpdateDeadline, showToast, formLoading,
+        showEditCourseModal, setShowEditCourseModal, editCourseForm, setEditCourseForm,
+        handleEditCourseSubmit
     } = props;
 
     return (
@@ -101,6 +108,31 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                             </div>
                             <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
                                 {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> AUTHORIZE DEPLOYMENT</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {showEditCourseModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditCourseModal(false)}>
+                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowEditCourseModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Edit Program</h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Architectural Refinement</p>
+                        </div>
+                        <form onSubmit={handleEditCourseSubmit} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Title</label>
+                                <input required value={editCourseForm.name} onChange={e => setEditCourseForm({ ...editCourseForm, name: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="e.g. FULLSTACK NEURAL ENG" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Descriptor</label>
+                                <textarea value={editCourseForm.description} onChange={e => setEditCourseForm({ ...editCourseForm, description: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all min-h-[140px] font-bold placeholder:text-muted-foreground/30" placeholder="Define program objectives..." />
+                            </div>
+                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><FileText className="w-5 h-5" /> SAVE REVISIONS</>}
                             </button>
                         </form>
                     </div>

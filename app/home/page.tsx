@@ -12,7 +12,7 @@ import { API_ENDPOINTS } from "@/app/lib/api";
 import {
     BookOpen, Award, Users, BarChart3,
     ArrowRight, Shield, Zap, Globe, CheckCircle, Play,
-    MessageSquare, Mail, Phone, Loader2
+    MessageSquare, Mail, Phone, Loader2, Layers
 } from "lucide-react";
 
 // ─── Floating 3D Particle ───────────────────────────────
@@ -201,6 +201,24 @@ export default function HomePage() {
             }
         }
     }, [mounted]);
+
+    const [batches, setBatches] = useState<any[]>([]);
+    const [loadingBatches, setLoadingBatches] = useState(true);
+
+    useEffect(() => {
+        const fetchBatches = async () => {
+            try {
+                const res = await axios.get(API_ENDPOINTS.BATCHS);
+                // Technical filter: List batches which are not finalized
+                setBatches(res.data.filter((b: any) => !b.is_finalized));
+            } catch (err) {
+                console.error("Failed to fetch batches:", err);
+            } finally {
+                setLoadingBatches(false);
+            }
+        };
+        fetchBatches();
+    }, []);
 
     const features = [
         { icon: <BookOpen className="w-6 h-6" />, title: "Structured Batch Courses", description: "Enroll in professionally managed cohort-based courses. Track your progress from Day 1 to certification.", delay: 0 },
@@ -421,6 +439,108 @@ export default function HomePage() {
                         </div>
                     </div>
                 </section>
+
+                {/* ── ACTIVE COHORTS ── */}
+                {batches.length > 0 && (
+                    <section id="batches" className="relative py-32 px-6 border-t border-border bg-gradient-to-b from-muted/5 to-transparent scroll-mt-20">
+                        <div className="max-w-7xl mx-auto">
+                            <FadeIn className="text-center mb-16 md:mb-24">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-6">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Learning Matrix</p>
+                                </div>
+                                <h2 className="text-4xl md:text-6xl font-black text-foreground mb-6 leading-tight tracking-tight">
+                                    Upcoming <span className="text-gradient">Learning Clusters</span>
+                                </h2>
+                                <p className="text-muted-foreground max-w-xl mx-auto text-sm md:text-base">
+                                    Join our upcoming cohort-based programs. High-intensity training with industry veterans, starting soon.
+                                </p>
+                            </FadeIn>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {batches.map((batch, i) => {
+                                    const isOpen = batch.enrollment_status === 'open';
+                                    const isUpcoming = batch.batch_status === 'upcoming';
+                                    
+                                    return (
+                                        <FadeIn key={batch.id} delay={i * 0.1}>
+                                            <div className="group relative glass-panel rounded-[2.5rem] border border-border/40 bg-card/40 backdrop-blur-3xl overflow-hidden hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 hover:-translate-y-2">
+                                                {/* Status Pill */}
+                                                <div className="absolute top-6 right-6 z-10">
+                                                    <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border backdrop-blur-md ${
+                                                        isOpen ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-lg shadow-emerald-500/5' : 
+                                                        'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                                    }`}>
+                                                        {isOpen ? 'Admission Open' : 'Starting Soon'}
+                                                    </div>
+                                                </div>
+
+                                                <div className="p-8 md:p-10 flex flex-col h-full">
+                                                    {/* Course Identifier */}
+                                                    <div className="flex items-center gap-3 mb-6">
+                                                        <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border/30 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                                                            <Layers className="w-5 h-5" />
+                                                        </div>
+                                                        <div className="h-px flex-1 bg-border/30" />
+                                                    </div>
+
+                                                    {/* Title & Batch ID */}
+                                                    <div className="space-y-1 mb-6">
+                                                        <h3 className="text-2xl font-black text-foreground leading-tight tracking-tight group-hover:text-primary transition-colors duration-300">
+                                                            {batch.course_name}
+                                                        </h3>
+                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40">
+                                                            Cluster Sync: {batch.name}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Instructor Context */}
+                                                    <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl bg-muted/20 border border-border/10">
+                                                        <div className="w-8 h-8 rounded-lg bg-foreground text-background flex items-center justify-center text-[10px] font-black">
+                                                            {batch.instructor_name?.charAt(0) || '?'}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter opacity-70">Expert Mentor</span>
+                                                            <span className="text-xs font-bold text-foreground">{batch.instructor_name || 'System Orchestrator'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Metrics Grid */}
+                                                    <div className="grid grid-cols-2 gap-4 mb-10 pt-6 border-t border-border/20">
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-1">Duration</p>
+                                                            <p className="text-sm font-black text-foreground">{batch.duration_days} Days</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-1">Next Sync</p>
+                                                            <p className="text-sm font-black text-foreground">
+                                                                {batch.enrollment_end_date ? new Date(batch.enrollment_end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'TBA'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Pricing & CTA */}
+                                                    <div className="mt-auto flex items-center justify-between gap-4">
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-0.5">Program Fee</p>
+                                                            <p className="text-2xl font-black text-foreground tracking-tighter">₹{Number(batch.price).toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                        <button 
+                                                            onClick={handleCTA}
+                                                            className="flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-xl shadow-foreground/5 hover:shadow-primary/20"
+                                                        >
+                                                            Join Batch <ArrowRight className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </FadeIn>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* ── SERVICE INQUIRY ── */}
                 <section id="service-inquiry" className="relative py-40 px-6 overflow-hidden">

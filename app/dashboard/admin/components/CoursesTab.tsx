@@ -1,20 +1,24 @@
 'use client';
 
 import React from 'react';
-import { Plus, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Trash2, Edit2 } from 'lucide-react';
 
 interface CoursesTabProps {
     courses: any[];
     tabLoading: boolean;
     setShowCourseModal: (show: boolean) => void;
     handleDeleteCourse: (id: number) => void;
+    setShowEditCourseModal: (show: boolean) => void;
+    setEditCourseForm: (form: any) => void;
 }
 
 const CoursesTab: React.FC<CoursesTabProps> = ({
     courses,
     tabLoading,
     setShowCourseModal,
-    handleDeleteCourse
+    handleDeleteCourse,
+    setShowEditCourseModal,
+    setEditCourseForm
 }) => {
     return (
         <div className="animate-fade-in relative min-h-[600px] px-2">
@@ -52,9 +56,17 @@ const CoursesTab: React.FC<CoursesTabProps> = ({
                                         </p>
                                     </td>
                                     <td className="py-8 px-8 text-right">
-                                        <button onClick={() => handleDeleteCourse(course.id)} className="p-3.5 rounded-2xl text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all border border-border/10 hover:border-rose-500/30 group">
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
+                                        <div className="flex justify-end gap-3">
+                                            <button onClick={() => {
+                                                setEditCourseForm({ id: course.id, name: course.name, description: course.description || '' });
+                                                setShowEditCourseModal(true);
+                                            }} className="p-3.5 rounded-2xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all border border-border/10 hover:border-primary/30 group" title="Edit Program">
+                                                <Edit2 className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={() => handleDeleteCourse(course.id)} className="p-3.5 rounded-2xl text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all border border-border/10 hover:border-rose-500/30 group" title="Delete Program">
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

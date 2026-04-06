@@ -115,6 +115,12 @@ export const useAdminData = () => {
     const [showEditDeadlineModal, setShowEditDeadlineModal] = useState(false);
     const [selectedBatchForDeadline, setSelectedBatchForDeadline] = useState<any>(null);
     const [editDeadlineForm, setEditDeadlineForm] = useState({ date: "", time: "" });
+    const [showEditCourseModal, setShowEditCourseModal] = useState(false);
+    const [editCourseForm, setEditCourseForm] = useState({
+        id: -1,
+        name: "",
+        description: ""
+    });
 
     // Settings states
     const [profileForm, setProfileForm] = useState({ name: "", email: "", phone: "" });
@@ -704,6 +710,25 @@ export const useAdminData = () => {
         }
     };
 
+    const handleEditCourseSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.COURSES}/${editCourseForm.id}`, {
+                name: editCourseForm.name,
+                description: editCourseForm.description
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            setShowEditCourseModal(false);
+            loadData('courses');
+            showToast("Course updated", "success");
+        } catch (err) {
+            showToast("Failed to update course", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
     const handleCreateInstructor = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormLoading(true);
@@ -1242,6 +1267,7 @@ export const useAdminData = () => {
         attCourseId, setAttCourseId, attBatchId, setAttBatchId, attendanceData, attLoading,
         showCourseModal, setShowCourseModal, showBatchModal, setShowBatchModal,
         showEditBatchModal, setShowEditBatchModal, editBatchForm, setEditBatchForm,
+        showEditCourseModal, setShowEditCourseModal, editCourseForm, setEditCourseForm,
         selectedBatches, setSelectedBatches, bulkLoading, showEnrollmentModal,
         setShowEnrollmentModal, showCertModal, setShowCertModal, showInstructorModal,
         setShowInstructorModal, showEditDeadlineModal, setShowEditDeadlineModal,
@@ -1265,7 +1291,7 @@ export const useAdminData = () => {
         // Actions
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, handleSaveGeneralSettings,
         handleUpdateDeadline, showToast, fetchAttendanceData,
-        handleCreateCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
+        handleCreateCourse, handleEditCourseSubmit, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, handleBulkEnrollmentAction,
         handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings,
