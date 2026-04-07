@@ -1151,10 +1151,10 @@ export const useAdminData = () => {
     };
 
     const handleSelectAllBatches = () => {
-        if (selectedBatches.length === batches.length) {
+        if (selectedBatches.length === filteredBatches.length && filteredBatches.length > 0) {
             setSelectedBatches([]);
         } else {
-            setSelectedBatches(batches.map((b: any) => b.id));
+            setSelectedBatches(filteredBatches.map((b: any) => b.id));
         }
     };
 

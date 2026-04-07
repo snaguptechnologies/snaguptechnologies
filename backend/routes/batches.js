@@ -142,6 +142,66 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
   }
 });
 
+// PUT /api/batches/bulk-update - admin only
+router.put('/bulk-update', authenticateToken, requireRole('admin'), async (req, res) => {
+  const { ids, action } = req.body; 
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'No batch IDs provided' });
+  }
+
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    const today = todayIST();
+
+    let query = "";
+    let params = [];
+    let targetIds = ids;
+
+    if (action === 'open_enrollment') {
+      const targetIdsToOpen = [];
+      for (const id of ids) {
+        const [b] = await db.execute('SELECT is_finalized FROM batches WHERE id = ?', [id]);
+        if (b[0] && !b[0].is_finalized) targetIdsToOpen.push(id);
+      }
+      
+      if (targetIdsToOpen.length === 0) return res.status(400).json({ error: 'All selected batches are finalized and cannot be reopened.' });
+      
+      const subPlaceholders = targetIdsToOpen.map(() => '?').join(',');
+      query = `UPDATE batches SET enrollment_status = 'open', batch_status = 'active' WHERE id IN (${subPlaceholders})`;
+      params = targetIdsToOpen;
+      targetIds = targetIdsToOpen;
+    } else if (action === 'close_enrollment') {
+      query = `UPDATE batches SET enrollment_status = 'closed' WHERE id IN (${placeholders})`;
+      params = ids;
+    } else if (action === 'end_batch') {
+      query = `UPDATE batches SET batch_status = 'completed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
+      params = [today, ...ids];
+    } else if (action === 'official_close') {
+      query = `UPDATE batches SET batch_status = 'closed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
+      params = [today, ...ids];
+    } else {
+      return res.status(400).json({ error: 'Invalid bulk action' });
+    }
+
+    await db.execute(query, params);
+
+    if (action === 'open_enrollment') {
+      for (const id of targetIds) {
+        const [b] = await db.execute('SELECT enrollment_status FROM batches WHERE id = ?', [id]);
+        if (b[0] && b[0].enrollment_status === 'open') {
+          await triggerWaitlistNotifications(id);
+        }
+      }
+    }
+
+    res.json({ message: `Bulk update (${action}) successful for ${targetIds.length} batches.` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to perform bulk update' });
+  }
+});
+
 // PUT /api/batches/:id - edit batch details
 router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   const { name, course_id, instructor_id, duration_days, price } = req.body;
@@ -576,66 +636,6 @@ router.post('/:id/read-guideline', authenticateToken, requireRole('student'), as
   } catch(err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to log guideline read' });
-  }
-});
-
-// PUT /api/batches/bulk-update - admin only
-router.put('/bulk-update', authenticateToken, requireRole('admin'), async (req, res) => {
-  const { ids, action } = req.body; 
-
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return res.status(400).json({ error: 'No batch IDs provided' });
-  }
-
-  try {
-    const placeholders = ids.map(() => '?').join(',');
-    const today = todayIST();
-
-    let query = "";
-    let params = [];
-    let targetIds = ids;
-
-    if (action === 'open_enrollment') {
-      const targetIdsToOpen = [];
-      for (const id of ids) {
-        const [b] = await db.execute('SELECT is_finalized FROM batches WHERE id = ?', [id]);
-        if (b[0] && !b[0].is_finalized) targetIdsToOpen.push(id);
-      }
-      
-      if (targetIdsToOpen.length === 0) return res.status(400).json({ error: 'All selected batches are finalized and cannot be reopened.' });
-      
-      const subPlaceholders = targetIdsToOpen.map(() => '?').join(',');
-      query = `UPDATE batches SET enrollment_status = 'open', batch_status = 'active' WHERE id IN (${subPlaceholders})`;
-      params = targetIdsToOpen;
-      targetIds = targetIdsToOpen;
-    } else if (action === 'close_enrollment') {
-      query = `UPDATE batches SET enrollment_status = 'closed' WHERE id IN (${placeholders})`;
-      params = ids;
-    } else if (action === 'end_batch') {
-      query = `UPDATE batches SET batch_status = 'completed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
-      params = [today, ...ids];
-    } else if (action === 'official_close') {
-      query = `UPDATE batches SET batch_status = 'closed', enrollment_status = 'closed', end_date = ?, material_link = NULL, material_message = NULL, broadcast_message = NULL WHERE id IN (${placeholders})`;
-      params = [today, ...ids];
-    } else {
-      return res.status(400).json({ error: 'Invalid bulk action' });
-    }
-
-    await db.execute(query, params);
-
-    if (action === 'open_enrollment') {
-      for (const id of targetIds) {
-        const [b] = await db.execute('SELECT enrollment_status FROM batches WHERE id = ?', [id]);
-        if (b[0] && b[0].enrollment_status === 'open') {
-          await triggerWaitlistNotifications(id);
-        }
-      }
-    }
-
-    res.json({ message: `Bulk update (${action}) successful for ${targetIds.length} batches.` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to perform bulk update' });
   }
 });
 
