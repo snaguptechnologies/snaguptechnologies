@@ -847,6 +847,8 @@ export default function HomePage() {
                             <span className="font-black text-muted-foreground tracking-[0.15em] text-sm uppercase">Snagup Technologies</span>
                         </Link>
                         <div className="flex items-center gap-8 text-xs text-muted-foreground font-medium">
+                            <Link href="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
+                            <span>•</span>
                             <span>© 2026 Snagup Technologies</span>
                             <span>•</span>
                             <span>All Rights Reserved</span>

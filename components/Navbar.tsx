@@ -61,6 +61,7 @@ export default function Navbar() {
         { name: "Home", href: "/home" },
         { name: "Services", href: "/home#services" },
         { name: "Verify", href: "/home#verify" },
+        { name: "Contact", href: "/contact" },
     ];
 
     if (pathname === "/login" || pathname === "/register" || pathname?.startsWith("/dashboard")) return null;
