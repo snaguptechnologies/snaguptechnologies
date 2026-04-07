@@ -29,7 +29,7 @@ export default function ContactPage() {
             name: "LinkedIn",
             value: "Snagup Technologies",
             icon: <Linkedin className="w-6 h-6" />,
-            href: "https://linkedin.com/company/snagup-technologies",
+            href: "https://www.linkedin.com/in/snagup-technologies-75b7913bb/",
             color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
             hover: "hover:bg-blue-500 hover:text-white"
         }
