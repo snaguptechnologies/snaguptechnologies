@@ -497,7 +497,16 @@ export default function InstructorDashboard() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSettingsMessage({ type: "success", text: "Profile updated successfully!" });
+            
+            // Sync localStorage user info
+            const storedUser = localStorage.getItem("snagup_user");
+            if (storedUser) {
+                const userData = JSON.parse(storedUser);
+                localStorage.setItem("snagup_user", JSON.stringify({ ...userData, ...profileForm }));
+            }
+            
             fetchStats();
+
         } catch (err: any) {
             setSettingsMessage({ type: "error", text: err.response?.data?.error || "Failed to update profile" });
         } finally {

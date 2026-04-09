@@ -51,3 +51,11 @@
     at PromisePool.execute (D:\myprojects\snaguptechnologies\backend\node_modules\mysql2\lib\promise\pool.js:54:22)
     at D:\myprojects\snaguptechnologies\backend\routes\dashboard.js:24:34
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[2026-04-06T09:37:40.371Z] Admin dashboard error: Error: read ECONNRESET
+    at PromisePool.execute (D:\myprojects\snaguptechnologies\backend\node_modules\mysql2\lib\promise\pool.js:54:22)
+    at D:\myprojects\snaguptechnologies\backend\routes\dashboard.js:70:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[2026-04-06T09:37:40.521Z] Admin dashboard error: Error: read ECONNRESET
+    at PromisePool.execute (D:\myprojects\snaguptechnologies\backend\node_modules\mysql2\lib\promise\pool.js:54:22)
+    at D:\myprojects\snaguptechnologies\backend\routes\dashboard.js:70:44
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

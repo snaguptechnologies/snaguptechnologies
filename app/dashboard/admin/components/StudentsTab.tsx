@@ -1,43 +1,122 @@
 'use client';
 
-import React from 'react';
-import { Search, Loader2, User, Globe, Phone, Trash2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Loader2, User, Globe, Phone, Trash2, ChevronDown } from 'lucide-react';
 
 interface StudentsTabProps {
     students: any[];
-    filteredStudents: any[];
+    // filteredStudents prop retained for backward compatibility but will be ignored in favor of internal filtering
+    filteredStudents?: any[];
     studentSearch: string;
     setStudentSearch: (search: string) => void;
     tabLoading: boolean;
     handleDeleteUser: (id: number, name: string) => void;
+    courses: any[];
+    batches: any[];
 }
 
 const StudentsTab: React.FC<StudentsTabProps> = ({
     students,
-    filteredStudents,
+    filteredStudents = [],
     studentSearch,
     setStudentSearch,
     tabLoading,
-    handleDeleteUser
+    handleDeleteUser,
+    courses = [],
+    batches = []
 }) => {
+    // New separate filters for Course and Batch
+    const [selectedCourse, setSelectedCourse] = useState<string>('');
+    const [selectedBatch, setSelectedBatch] = useState<string>('');
+
+    // Filter available batches for the dropdown based on selected course
+    const availableBatches = useMemo(() => {
+        if (!selectedCourse) return batches;
+        return batches.filter(b => b.course_id.toString() === selectedCourse);
+    }, [batches, selectedCourse]);
+
+    const computeFiltered = () => {
+        // Base filter by name/email (existing search)
+        let list = students.filter((s) =>
+            (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+            (s.email || '').toLowerCase().includes(studentSearch.toLowerCase())
+        );
+
+        // Filter by Course
+        if (selectedCourse) {
+            list = list.filter((s) =>
+                s.enrollments && Array.isArray(s.enrollments) && s.enrollments.some((e: any) => e.course_id.toString() === selectedCourse)
+            );
+        }
+
+        // Filter by Batch
+        if (selectedBatch) {
+            list = list.filter((s) =>
+                s.enrollments && Array.isArray(s.enrollments) && s.enrollments.some((e: any) => e.batch_id.toString() === selectedBatch)
+            );
+        }
+
+        return list;
+    };
+
+    const displayStudents = computeFiltered();
+
     return (
         <div className="animate-fade-in relative min-h-[600px] px-2">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
                 <div>
                     <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase mb-1">Student Registry</h1>
                     <p className="text-[10px] text-muted-foreground font-black tracking-[0.2em] uppercase opacity-50">Enrolled Learner Management & Data Control</p>
                 </div>
-                <div className="flex-1 max-w-sm w-full flex items-center gap-2 px-3 py-2.5 bg-muted/20 border border-border/20 rounded-2xl focus-within:ring-2 focus-within:ring-foreground/10 transition-all">
-                    <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <input
-                        type="text"
-                        placeholder="Search student name or email..."
-                        value={studentSearch}
-                        onChange={(e) => setStudentSearch(e.target.value)}
-                        className="flex-1 bg-transparent text-[12px] font-medium focus:outline-none placeholder:text-muted-foreground/50 text-foreground min-w-0"
-                    />
+                
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:max-w-4xl">
+                    {/* Search Field */}
+                    <div className="flex-1 w-full flex items-center gap-3 px-4 py-3 bg-muted/20 border border-border/20 rounded-2xl focus-within:ring-2 focus-within:ring-foreground/10 transition-all">
+                        <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Find by name or email..."
+                            value={studentSearch}
+                            onChange={(e) => setStudentSearch(e.target.value)}
+                            className="flex-1 bg-transparent text-[13px] font-bold focus:outline-none placeholder:text-muted-foreground/50 text-foreground min-w-0"
+                        />
+                    </div>
+
+                    {/* Course Filter */}
+                    <div className="w-full sm:w-48 relative group">
+                        <select
+                            value={selectedCourse}
+                            onChange={(e) => {
+                                setSelectedCourse(e.target.value);
+                                setSelectedBatch(''); // Reset batch when course changes
+                            }}
+                            className="w-full appearance-none bg-muted/20 border border-border/20 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer hover:bg-muted/30"
+                        >
+                            <option value="">All Courses</option>
+                            {courses.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-foreground transition-colors" size={14} />
+                    </div>
+
+                    {/* Batch Filter */}
+                    <div className="w-full sm:w-48 relative group">
+                        <select
+                            value={selectedBatch}
+                            onChange={(e) => setSelectedBatch(e.target.value)}
+                            className="w-full appearance-none bg-muted/20 border border-border/20 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer hover:bg-muted/30"
+                        >
+                            <option value="">All Batches</option>
+                            {availableBatches.map((b) => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-foreground transition-colors" size={14} />
+                    </div>
                 </div>
             </div>
+
             {tabLoading ? (
                 <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="w-12 h-12 text-foreground animate-spin" strokeWidth={3} /></div>
             ) : (
@@ -53,7 +132,7 @@ const StudentsTab: React.FC<StudentsTabProps> = ({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/10">
-                            {filteredStudents.map((student: any) => (
+                            {displayStudents.map((student: any) => (
                                 <tr key={student.id} className="hover:bg-foreground/[0.02] transition-colors group">
                                     <td className="py-8 pr-8">
                                         <div className="flex items-center gap-4">
@@ -97,7 +176,7 @@ const StudentsTab: React.FC<StudentsTabProps> = ({
                                     </td>
                                 </tr>
                             ))}
-                            {students.length === 0 && (
+                            {displayStudents.length === 0 && (
                                 <tr><td colSpan={5} className="py-32 text-center text-muted-foreground italic font-black uppercase tracking-widest opacity-20">No students currently registered</td></tr>
                             )}
                         </tbody>

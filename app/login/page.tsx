@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Zap, Globe, Home, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { BookOpen, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Zap, Globe, Home, Eye, EyeOff, CheckCircle, ArrowRight } from "lucide-react";
+
+
+
 import Image from "next/image";
 import BrandLogo from "@/components/BrandLogo";
 import axios from "axios";
@@ -190,11 +194,17 @@ export default function Login() {
                     <Home className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                 </Link>
 
-                <div className="w-full max-w-md animate-fade-in">
+                <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="w-full max-w-md"
+                >
                     <div className="mb-10">
                         <h2 className="text-4xl font-bold text-foreground mb-2">Welcome Back</h2>
                         <p className="text-muted-foreground">Enter your credentials to access your dashboard.</p>
                     </div>
+
 
                     {error && (
                         <div className="mb-6 p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 text-destructive animate-slide-up">
@@ -270,7 +280,8 @@ export default function Login() {
                             Create Workspace Account
                         </Link>
                     </p>
-                </div>
+                </motion.div>
+
 
                 {/* Forgot Password Modal Overlay */}
                 {showForgotModal && (

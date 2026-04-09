@@ -325,7 +325,10 @@ export default function AdminDashboard() {
                                     filteredStudents={filteredStudents}
                                     tabLoading={tabLoading}
                                     handleDeleteUser={handleDeleteUser}
+                                    courses={courses}
+                                    batches={batches}
                                 />
+
                             )}
 
                             {/* BATCHES TAB */}

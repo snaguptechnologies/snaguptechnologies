@@ -343,7 +343,16 @@ function StudentDashboardContent() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSettingsMessage({ type: "success", text: "Profile updated successfully!" });
+            
+            // Sync localStorage user info
+            const storedUser = localStorage.getItem("snagup_user");
+            if (storedUser) {
+                const userData = JSON.parse(storedUser);
+                localStorage.setItem("snagup_user", JSON.stringify({ ...userData, ...profileForm }));
+            }
+            
             fetchStats();
+
         } catch (err: any) {
             setSettingsMessage({ type: "error", text: err.response?.data?.error || "Failed to update profile" });
         } finally {
@@ -1049,9 +1058,9 @@ function StudentDashboardContent() {
                                                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1">Email Address</label>
                                                     <input 
                                                         value={profileForm.email} 
+                                                        onChange={e => setProfileForm({...profileForm, email: e.target.value})}
                                                         placeholder="email@example.com" 
-                                                        className="w-full bg-muted/30 border border-border/50 rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold opacity-70 cursor-not-allowed" 
-                                                        disabled
+                                                        className="w-full bg-muted/30 border border-border/50 rounded-2xl px-6 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold" 
                                                     />
                                                 </div>
                                             </div>

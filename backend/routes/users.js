@@ -7,19 +7,32 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 router.get('/students', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const [students] = await db.execute(`
-            SELECT id, name, email, phone, is_active, created_at
-            FROM users
-            WHERE role = 'student'
-            ORDER BY created_at DESC
+            SELECT 
+                u.id, u.name, u.email, u.phone, u.is_active, u.created_at,
+                COUNT(e.id) as enrollment_count,
+                CASE 
+                    WHEN COUNT(e.id) > 0 THEN 
+                        JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'batch_id', b.id,
+                                'batch_name', b.name,
+                                'course_id', c.id,
+                                'course_name', c.name
+                            )
+                        )
+                    ELSE JSON_ARRAY()
+                END as enrollments
+            FROM users u
+            LEFT JOIN enrollments e ON u.id = e.student_id
+            LEFT JOIN batches b ON e.batch_id = b.id
+            LEFT JOIN courses c ON b.course_id = c.id
+            WHERE u.role = 'student'
+            GROUP BY u.id
+            ORDER BY u.created_at DESC
         `);
 
-        // Attach enrollment counts
-        for (let s of students) {
-            const [stats] = await db.execute(`SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?`, [s.id]);
-            s.enrollment_count = stats[0].count;
-        }
-
         res.json(students);
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch students' });

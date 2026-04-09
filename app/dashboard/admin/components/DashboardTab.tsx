@@ -352,13 +352,33 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                             <h2 className="text-xs font-black text-primary uppercase tracking-[.25em] px-2 mb-2">Operational Progress</h2>
                             <p className="text-[9px] text-muted-foreground font-bold tracking-[.15em] uppercase opacity-50 px-2 leading-none">Real-time learning velocity & completion status</p>
                         </div>
-                        <div className="p-8 md:p-10 rounded-[2.5rem] bg-card border border-border/20 max-w-2xl min-h-[500px] flex flex-col">
-                            <h3 className="text-xs font-black text-foreground tracking-[.2em] uppercase mb-10 opacity-70">Batch Completion Velocity</h3>
-                            <div className="flex-1">
-                                <RadialProgressChart data={chartData.activeProgress} />
-                            </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                            {chartData.activeProgress.length > 0 ? (
+                                chartData.activeProgress.map((batch: any, idx: number) => (
+                                    <div key={idx} className="p-8 md:p-10 rounded-[2.5rem] bg-card border border-border/20 flex flex-col justify-between min-h-[400px] group hover:border-primary/20 transition-all">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <h3 className="text-[10px] font-black text-foreground tracking-[.2em] uppercase opacity-70">Velocity Metrics</h3>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                                <span className="text-[8px] font-black text-primary uppercase tracking-widest">{batch.status}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex-1 flex items-center justify-center">
+                                            <RadialProgressChart data={[batch]} />
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="col-span-full p-20 rounded-[2.5rem] bg-card border border-border/10 flex flex-col items-center justify-center text-center">
+                                    <Activity className="w-12 h-12 text-muted-foreground/20 mb-4" />
+                                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40">No active batches for progress tracking</p>
+                                </div>
+                            )}
                         </div>
                     </div>
+
                 </div>
             ) : (
                 <div className="space-y-16 animate-in slide-in-from-bottom-4 duration-500">

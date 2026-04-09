@@ -59,10 +59,12 @@ export default function Navbar() {
 
     const navLinks = [
         { name: "Home", href: "/home" },
+        { name: "Courses", href: "/home#batches" },
         { name: "Services", href: "/home#services" },
         { name: "Verify", href: "/home#verify" },
         { name: "Contact", href: "/contact" },
     ];
+
 
     if (pathname === "/login" || pathname === "/register" || pathname?.startsWith("/dashboard")) return null;
 

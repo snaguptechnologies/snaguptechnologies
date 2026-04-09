@@ -148,15 +148,15 @@ export const RadialProgressChart = ({ data }: { data: any[] }) => {
     }));
 
     return (
-        <div className="h-[500px] w-full flex flex-col">
-            <div className="flex-1 min-h-[340px] relative">
+        <div className="h-[380px] w-full flex flex-col">
+            <div className="flex-1 min-h-[280px] relative">
                 <ResponsiveContainer width="100%" height="100%">
                     <RadialBarChart 
                         cx="50%" 
                         cy="50%" 
-                        innerRadius="55%" 
+                        innerRadius="65%" 
                         outerRadius="100%" 
-                        barSize={14} 
+                        barSize={12} 
                         data={chartData}
                         startAngle={90}
                         endAngle={450}
@@ -178,10 +178,10 @@ export const RadialProgressChart = ({ data }: { data: any[] }) => {
                             <g>
                                 <text
                                     x="50%"
-                                    y="50%"
+                                    y="48%"
                                     textAnchor="middle"
                                     dominantBaseline="middle"
-                                    className="fill-blue-500 font-black text-2xl tracking-tighter"
+                                    className="fill-blue-500 font-extrabold text-3xl tracking-tighter"
                                 >
                                     {chartData[0].completed}/{chartData[0].total}
                                 </text>
@@ -190,13 +190,13 @@ export const RadialProgressChart = ({ data }: { data: any[] }) => {
                                     y="58%"
                                     textAnchor="middle"
                                     dominantBaseline="middle"
-                                    className="fill-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-50"
+                                    className="fill-muted-foreground font-black text-[9px] uppercase tracking-[0.4em] opacity-40"
                                 >
                                     DAYS
                                 </text>
                             </g>
                         )}
-
+                        
                         <Tooltip 
                             content={({ active, payload }: any) => {
                                 if (active && payload && payload.length) {
@@ -220,22 +220,18 @@ export const RadialProgressChart = ({ data }: { data: any[] }) => {
 
             {/* Centered Batch Details Below the Chart */}
             {chartData[0] && (
-                <div className="mt-4 flex flex-col items-center justify-center text-center space-y-1">
-                    <h4 className="text-lg font-black text-foreground tracking-tight uppercase">
+                <div className="mt-2 flex flex-col items-center justify-center text-center space-y-1">
+                    <h4 className="text-base font-black text-foreground tracking-tight uppercase">
                         {chartData[0].name}
                     </h4>
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-70">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] opacity-60">
                         {chartData[0].course}
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${chartData[0].status === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                            {chartData[0].status}
-                        </span>
-                    </div>
                 </div>
             )}
         </div>
     );
+
 };
 
 /**

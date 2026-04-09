@@ -284,11 +284,16 @@ export default function HomePage() {
                                         Start Learning
                                         <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
+                                    <Link href="#batches"
+                                        className="px-8 py-4 bg-muted/50 border border-border text-foreground rounded-2xl font-bold text-base hover:bg-muted transition-all flex items-center gap-3">
+                                        <BookOpen className="w-4 h-4 text-primary" /> View Courses
+                                    </Link>
                                     <Link href="#verify"
                                         className="px-8 py-4 border border-border text-foreground rounded-2xl font-bold text-base hover:bg-muted transition-all flex items-center gap-3">
-                                        <Award className="w-4 h-4 text-primary" /> Verify Certificate
+                                        <Award className="w-4 h-4 text-primary" /> Verify achievement
                                     </Link>
                                 </motion.div>
+
 
                                 {/* Trust indicators */}
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.5 }}
@@ -319,14 +324,14 @@ export default function HomePage() {
 
                 {/* ── STATS ── */}
                 <section className="relative py-24 border-y border-border bg-muted/30 backdrop-blur-[2px]">
-                    <div className="max-w-5xl mx-auto px-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <div className="max-w-3xl mx-auto px-6 text-center">
+                        <div className="grid grid-cols-2 gap-8">
+
                             {([
                                 { value: 100, suffix: "%", label: "Digital Certification" },
-                                { value: 3, suffix: "+", label: "Role-Based Dashboards" },
                                 { value: "Live", suffix: "", label: "Attendance Tracking" },
-                                { value: "24/7", suffix: "", label: "Platform Access" },
                             ] as Array<{ value: number | string; suffix: string; label: string }>).map(({ value, suffix, label }, i) => (
+
                                 <FadeIn key={label} delay={i * 0.1}>
                                     <div className="text-center">
                                         <div className="text-4xl md:text-5xl font-black text-foreground mb-2">
@@ -830,7 +835,8 @@ export default function HomePage() {
                                 <div className="flex flex-wrap gap-4 justify-center">
                                     <button onClick={handleCTA}
                                         className="group px-10 py-5 bg-primary text-primary-foreground rounded-2xl font-black text-lg hover:opacity-90 transition-all shadow-[0_0_60px_rgba(var(--primary),0.15)] flex items-center gap-3">
-                                        {user ? "Go to Dashboard" : "Get Started Free"}
+                                        {user ? "Go to Dashboard" : "Get Started"}
+
                                         <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
                                 </div>

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Zap, Globe, Home, Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
+
 import BrandLogo from "@/components/BrandLogo";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
@@ -53,7 +54,7 @@ export default function Register() {
                 <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
                 <div className="relative z-10 p-12 max-w-xl">
-                    <div className="flex items-center gap-4 mb-12 animate-fade-in">
+                    <div className="flex items-center gap-4 mb-12">
                         <div className="w-16 h-16 bg-card rounded-2xl flex items-center justify-center shadow-xl border border-border">
                             <BrandLogo size={48} priority />
                         </div>
@@ -112,7 +113,7 @@ export default function Register() {
 
                     {/* Back to Home Button */}
                     <Link
-                        href="/"
+                        href="/home"
                         className="absolute top-8 right-8 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-all group z-20"
                     >
                         <BrandLogo size={24} className="opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -120,7 +121,12 @@ export default function Register() {
                         <Home className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </Link>
 
-                    <div className="w-full max-w-lg animate-fade-in">
+                    <motion.div 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="w-full max-w-lg"
+                    >
                         <div className="mb-10 text-center lg:text-left">
                             <h2 className="text-4xl font-bold text-foreground mb-2">Join Us</h2>
                             <p className="text-muted-foreground">Create your student workspace to begin.</p>
@@ -169,7 +175,7 @@ export default function Register() {
                                         value={formData.phone}
                                         onChange={handleChange}
                                         className="w-full px-5 py-4 rounded-2xl bg-muted border border-border text-foreground placeholder-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/20 transition-all font-medium"
-                                        placeholder="+1 234 567 890"
+                                        placeholder="+91 00000 00000"
                                         suppressHydrationWarning
                                     />
                                 </div>
@@ -217,7 +223,7 @@ export default function Register() {
                                 Sign In to Workspace
                             </Link>
                         </p>
-                    </div>
+                    </motion.div>
                 </div>
             </div>
         </div>
