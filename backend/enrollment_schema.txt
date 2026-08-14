@@ -1,0 +1,17 @@
+CREATE TABLE `enrollments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `batch_id` int NOT NULL,
+  `enrolled_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `status` enum('pending','approved','rejected','partial') DEFAULT 'pending',
+  `last_read_guideline_at` datetime DEFAULT NULL,
+  `admin_feedback` text DEFAULT NULL,
+  `is_utr_updated` tinyint(1) DEFAULT '0',
+  `rejection_category` varchar(255) DEFAULT NULL,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) /*T![clustered_index] CLUSTERED */,
+  UNIQUE KEY `student_id` (`student_id`,`batch_id`),
+  KEY `fk_2` (`batch_id`),
+  CONSTRAINT `fk_1` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_2` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin AUTO_INCREMENT=30001

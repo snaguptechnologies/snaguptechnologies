@@ -1,0 +1,24 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function Root() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const user = localStorage.getItem("snagup_user");
+    if (user) {
+      const { role } = JSON.parse(user);
+      router.replace(`/dashboard/${role}`);
+    } else {
+      router.replace("/home");
+    }
+  }, [router]);
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
+    </div>
+  );
+}
