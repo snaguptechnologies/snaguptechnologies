@@ -16,11 +16,9 @@ import { useAdminData } from './hooks/useAdminData';
 // Sub-components
 import DashboardTab from './components/DashboardTab';
 import CoursesTab from './components/CoursesTab';
-import InstructorsTab from './components/InstructorsTab';
 import StudentsTab from './components/StudentsTab';
 import BatchesTab from './components/BatchesTab';
 import PaymentsTab from './components/PaymentsTab';
-import InquiriesTab from './components/InquiriesTab';
 import AttendanceTab from './components/AttendanceTab';
 import SettingsTab from './components/SettingsTab';
 import EmailsTab from './components/EmailsTab';
@@ -45,6 +43,8 @@ export default function AdminDashboard() {
         attendanceData, attLoading, showCourseModal, setShowCourseModal, showBatchModal, 
         setShowBatchModal, showEditBatchModal, setShowEditBatchModal, editBatchForm, setEditBatchForm, 
         showEditCourseModal, setShowEditCourseModal, editCourseForm, setEditCourseForm,
+        courseSearch, setCourseSearch, courseStatusFilter, setCourseStatusFilter,
+        showViewCourseModal, setShowViewCourseModal, viewCourseData,
         selectedBatches, bulkLoading, showEnrollmentModal, setShowEnrollmentModal, 
         showCertModal, setShowCertModal, showInstructorModal, setShowInstructorModal, 
         showEditDeadlineModal, setShowEditDeadlineModal, selectedBatchForDeadline, 
@@ -54,12 +54,12 @@ export default function AdminDashboard() {
         notifSaving, upiMessage, settingsLoading, settingsMessage, settingsActiveTab, 
         setSettingsActiveTab, showPasswords, setShowPasswords, showInstPassword, 
         setShowInstPassword, courseForm, setCourseForm, batchForm, setBatchForm, 
-        instForm, setInstForm, formLoading, filteredBatches, filteredPayments, 
+        instForm, setInstForm, formLoading, filteredCourses, filteredBatches, filteredPayments, 
         filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, 
         selectedPayments, setSelectedPayments, rejectionModal, setRejectionModal,
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, 
         handleSaveGeneralSettings, handleUpdateDeadline, showToast, fetchAttendanceData, 
-        handleCreateCourse, handleEditCourseSubmit, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
+        handleCreateCourse, handleEditCourseSubmit, handleToggleCourseStatus, handleViewCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit, 
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, 
         handleBulkEnrollmentAction, handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings, 
@@ -84,13 +84,11 @@ export default function AdminDashboard() {
 
     const tabs = [
         { id: 'dashboard', label: 'Dashboard', icon: <Layers className="w-4 h-4" /> },
-        { id: 'courses', label: 'Courses', icon: <BookOpen className="w-4 h-4" /> },
-        { id: 'instructors', label: 'Instructors', icon: <GraduationCap className="w-4 h-4" /> },
-        { id: 'batches', label: 'Batches', icon: <Clock className="w-4 h-4" /> },
+        { id: 'courses', label: 'Course Management', icon: <BookOpen className="w-4 h-4" /> },
+        { id: 'batches', label: 'Course Enrollments', icon: <GraduationCap className="w-4 h-4" /> },
         { id: 'students', label: 'Students', icon: <User className="w-4 h-4" /> },
         { id: 'attendance', label: 'Attendance', icon: <Calendar className="w-4 h-4" /> },
         { id: 'certificates', label: 'Certificates', icon: <Award className="w-4 h-4" /> },
-        { id: 'inquiries', label: 'Inquiries', icon: <MessageSquare className="w-4 h-4" /> },
         { id: 'emails', label: 'Email Logs', icon: <Globe className="w-4 h-4" /> },
         { id: 'system_settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> },
     ];
@@ -123,16 +121,14 @@ export default function AdminDashboard() {
                                         }`}
                                 >
                                     {tab.id === 'dashboard' ? <Globe className="w-5 h-5" /> :
-                                        tab.id === 'batches' ? <Layers className="w-5 h-5" /> :
+                                        tab.id === 'batches' ? <GraduationCap className="w-5 h-5" /> :
                                             tab.id === 'courses' ? <BookOpen className="w-5 h-5" /> :
-                                                tab.id === 'instructors' ? <Shield className="w-5 h-5" /> :
-                                                    tab.id === 'students' ? <Users className="w-5 h-5" /> :
-                                                        tab.id === 'payments' ? <CheckCircle className="w-5 h-5" /> :
-                                                            tab.id === 'attendance' ? <Clock className="w-5 h-5" /> :
-                                                                tab.id === 'certificates' ? <Award className="w-5 h-5" /> :
-                                                                    tab.id === 'inquiries' ? <MessageSquare className="w-5 h-5" /> :
-                                                                        tab.id === 'system_settings' ? <Settings className="w-5 h-5" /> :
-                                                                    <Settings className="w-5 h-5" />}
+                                                tab.id === 'students' ? <Users className="w-5 h-5" /> :
+                                                    tab.id === 'payments' ? <CheckCircle className="w-5 h-5" /> :
+                                                        tab.id === 'attendance' ? <Clock className="w-5 h-5" /> :
+                                                            tab.id === 'certificates' ? <Award className="w-5 h-5" /> :
+                                                                tab.id === 'system_settings' ? <Settings className="w-5 h-5" /> :
+                                                            <Settings className="w-5 h-5" />}
                                     {tab.label}
                                 </button>
                             ))}
@@ -297,23 +293,21 @@ export default function AdminDashboard() {
                             {activeTab === 'courses' && (
                                 <CoursesTab 
                                     courses={courses}
+                                    filteredCourses={filteredCourses}
                                     tabLoading={tabLoading}
+                                    courseSearch={courseSearch}
+                                    setCourseSearch={setCourseSearch}
+                                    courseStatusFilter={courseStatusFilter}
+                                    setCourseStatusFilter={setCourseStatusFilter}
                                     setShowCourseModal={setShowCourseModal}
                                     handleDeleteCourse={handleDeleteCourse}
                                     setShowEditCourseModal={setShowEditCourseModal}
                                     setEditCourseForm={setEditCourseForm}
+                                    handleViewCourse={handleViewCourse}
+                                    handleToggleCourseStatus={handleToggleCourseStatus}
                                 />
                             )}
 
-                            {/* INSTRUCTORS TAB */}
-                            {activeTab === 'instructors' && (
-                                <InstructorsTab 
-                                    instructors={instructors}
-                                    tabLoading={tabLoading}
-                                    setShowInstructorModal={setShowInstructorModal}
-                                    handleDeleteUser={handleDeleteUser}
-                                />
-                            )}
 
                             {/* STUDENTS TAB */}
                             {activeTab === 'students' && (
@@ -324,43 +318,21 @@ export default function AdminDashboard() {
                                     filteredStudents={filteredStudents}
                                     tabLoading={tabLoading}
                                     handleDeleteUser={handleDeleteUser}
+                                    handleToggleUserStatus={adminProps.handleToggleUserStatus}
+                                    handleAdminEnrollStudent={adminProps.handleAdminEnrollStudent}
                                     courses={courses}
                                     batches={batches}
                                     setReleaseCertModal={adminProps.setReleaseCertModal}
                                 />
                             )}
 
-                            {/* BATCHES TAB */}
+                            {/* COURSE ENROLLMENTS TAB (Repurposed Batches Tab) */}
                             {activeTab === 'batches' && (
                                 <BatchesTab 
-                                    batches={batches}
-                                    filteredBatches={filteredBatches}
-                                    batchSearch={batchSearch}
-                                    setBatchSearch={setBatchSearch}
-                                    batchCourseFilter={batchCourseFilter}
-                                    setBatchCourseFilter={setBatchCourseFilter}
-                                    batchStatusFilter={batchStatusFilter}
-                                    setBatchStatusFilter={setBatchStatusFilter}
-                                    selectedBatches={selectedBatches}
-                                    handleSelectAllBatches={handleSelectAllBatches}
-                                    handleToggleBatchSelection={handleToggleBatchSelection}
-                                    tabLoading={tabLoading}
                                     courses={courses}
-                                    preloadDropdowns={preloadDropdowns}
-                                    setBatchForm={setBatchForm}
-                                    setShowBatchModal={setShowBatchModal}
-                                    handleToggleEnrollment={handleToggleEnrollment}
-                                    handleFinalizeBatch={handleFinalizeBatch}
-                                    openEditDeadline={openEditDeadline}
-                                    handleStartBatch={handleStartBatch}
-                                    handleEndBatch={handleEndBatch}
-                                    handleArchiveBatch={handleArchiveBatch}
-                                    setEditBatchForm={setEditBatchForm}
-                                    setShowEditBatchModal={setShowEditBatchModal}
-                                    handleDeleteBatch={handleDeleteBatch}
-                                    handleBulkBatchUpdate={handleBulkBatchUpdate}
-                                    bulkLoading={bulkLoading}
-                                    getLocalDatetime={getLocalDatetime}
+                                    enrollments={enrollments}
+                                    tabLoading={tabLoading}
+                                    students={students}
                                 />
                             )}
 
@@ -398,22 +370,6 @@ export default function AdminDashboard() {
                                     attLoading={attLoading}
                                     filteredAttendance={filteredAttendance}
                                     attendanceData={attendanceData}
-                                />
-                            )}
-
-                            {/* INQUIRIES TAB */}
-                            {activeTab === 'inquiries' && (
-                                <InquiriesTab 
-                                    inquirySearch={inquirySearch}
-                                    setInquirySearch={setInquirySearch}
-                                    inquiryServiceFilter={inquiryServiceFilter}
-                                    setInquiryServiceFilter={setInquiryServiceFilter}
-                                    inquiryStatusFilter={inquiryStatusFilter}
-                                    setInquiryStatusFilter={setInquiryStatusFilter}
-                                    filteredInquiries={filteredInquiries}
-                                    inquiries={inquiries}
-                                    tabLoading={tabLoading}
-                                    handleInquiryStatus={handleInquiryStatus}
                                 />
                             )}
 

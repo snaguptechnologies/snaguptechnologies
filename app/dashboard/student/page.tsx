@@ -1430,7 +1430,7 @@ function StudentDashboardContent() {
                             <>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 mb-4">{selectedCourse.batches.length} Available {selectedCourse.batches.length === 1 ? 'Batch' : 'Batches'}</p>
                                 {selectedCourse.batches.map((batch: any) => {
-                                    const isOpen = batch.batch_status === 'active' && batch.enrollment_status === 'open' && !batch.is_finalized;
+                                    const isOpen = !batch.is_finalized && batch.batch_status !== 'closed';
                                     const isUpcoming = batch.batch_status === 'upcoming';
                                     const isTemporarilyClosed = batch.enrollment_status === 'closed' && !batch.is_finalized;
                                     const isNotified = waitlistedBatches.includes(batch.id);

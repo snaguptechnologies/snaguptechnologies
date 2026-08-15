@@ -72,6 +72,8 @@ async function initializeTables() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         description TEXT,
+        learning_objectives TEXT,
+        prerequisites TEXT,
         duration_days INT DEFAULT 30,
         category VARCHAR(255) DEFAULT 'General',
         status ENUM('active','inactive') DEFAULT 'active',
@@ -286,6 +288,10 @@ async function initializeTables() {
       await connection.query(sql);
     }
     
+    // Ensure courses table columns exist
+    try { await connection.query(`ALTER TABLE courses ADD COLUMN learning_objectives TEXT`); } catch (e) {}
+    try { await connection.query(`ALTER TABLE courses ADD COLUMN prerequisites TEXT`); } catch (e) {}
+
     console.log("✅ MySQL Database schema initialized.");
 
     // Insert default settings

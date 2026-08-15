@@ -31,7 +31,7 @@ export const useAdminData = () => {
     const [attLoading, setAttLoading] = useState(false);
 
     // Active Tab with URL Hash Synchronization for Browser History
-    const [activeTab, _setActiveTab] = useState<'dashboard' | 'courses' | 'instructors' | 'students' | 'batches' | 'payments' | 'attendance' | 'settings' | 'system_settings' | 'inquiries' | 'emails' | 'certificates'>('dashboard');
+    const [activeTab, _setActiveTab] = useState<'dashboard' | 'courses' | 'students' | 'batches' | 'payments' | 'attendance' | 'settings' | 'system_settings' | 'emails' | 'certificates'>('dashboard');
     const [dashboardSubTab, setDashboardSubTab] = useState<'analytics' | 'financials'>('analytics');
     const [dateRange, setDateRange] = useState<'week' | 'month' | 'year' | 'all' | 'custom'>('month');
     const [customStartDate, setCustomStartDate] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
@@ -43,7 +43,7 @@ export const useAdminData = () => {
         if (typeof window !== 'undefined') {
             const handleHashChange = () => {
                 const hash = window.location.hash.replace('#', '');
-                const validTabs = ['dashboard', 'overview', 'courses', 'instructors', 'students', 'batches', 'payments', 'attendance', 'settings', 'system_settings', 'inquiries', 'emails', 'certificates'];
+                const validTabs = ['dashboard', 'overview', 'courses', 'students', 'batches', 'payments', 'attendance', 'settings', 'system_settings', 'emails', 'certificates'];
                 if (validTabs.includes(hash)) {
                     const finalTab = hash === 'overview' ? 'dashboard' : hash;
                     _setActiveTab(finalTab as any);
@@ -119,8 +119,16 @@ export const useAdminData = () => {
     const [editCourseForm, setEditCourseForm] = useState({
         id: -1,
         name: "",
-        description: ""
+        category: "Software Development",
+        status: "active",
+        description: "",
+        learning_objectives: "",
+        prerequisites: ""
     });
+    const [showViewCourseModal, setShowViewCourseModal] = useState(false);
+    const [viewCourseData, setViewCourseData] = useState<any>(null);
+    const [courseSearch, setCourseSearch] = useState("");
+    const [courseStatusFilter, setCourseStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
     // Settings states
     const [profileForm, setProfileForm] = useState({ name: "", email: "", phone: "" });
@@ -374,7 +382,30 @@ export const useAdminData = () => {
     }, [stats, enrollments, payments, batches, dateRange, chartCourseFilter, chartBatchFilter, customStartDate, customEndDate]);
 
     // Form states
-    const [courseForm, setCourseForm] = useState({ name: "", description: "" });
+    const [courseForm, setCourseForm] = useState({
+        name: "",
+        category: "Software Development",
+        status: "active",
+        description: "",
+        learning_objectives: "",
+        prerequisites: ""
+    });
+
+    const filteredCourses = useMemo(() => {
+        return courses.filter((c: any) => {
+            const courseIdStr = `SNAG-C${c.id.toString().padStart(3, '0')}`;
+            const query = courseSearch.trim().toLowerCase();
+            const matchesSearch = !query ||
+                c.name?.toLowerCase().includes(query) ||
+                c.category?.toLowerCase().includes(query) ||
+                c.id?.toString().includes(query) ||
+                courseIdStr.toLowerCase().includes(query);
+            
+            const matchesStatus = courseStatusFilter === 'all' || c.status === courseStatusFilter;
+            
+            return matchesSearch && matchesStatus;
+        });
+    }, [courses, courseSearch, courseStatusFilter]);
     const getLocalDatetime = () => {
         const d = new Date();
         const localD = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
@@ -695,16 +726,34 @@ export const useAdminData = () => {
 
     const handleCreateCourse = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!courseForm.name || !courseForm.name.trim()) {
+            showToast("Course name is required", "error");
+            return;
+        }
         setFormLoading(true);
         try {
             const token = localStorage.getItem("snagup_token");
-            await axios.post(API_ENDPOINTS.COURSES, courseForm, { headers: { Authorization: `Bearer ${token}` } });
+            await axios.post(API_ENDPOINTS.COURSES, {
+                name: courseForm.name.trim(),
+                category: courseForm.category || 'Software Development',
+                status: courseForm.status || 'active',
+                description: courseForm.description || '',
+                learning_objectives: courseForm.learning_objectives || '',
+                prerequisites: courseForm.prerequisites || ''
+            }, { headers: { Authorization: `Bearer ${token}` } });
             setShowCourseModal(false);
-            setCourseForm({ name: "", description: "" });
+            setCourseForm({
+                name: "",
+                category: "Software Development",
+                status: "active",
+                description: "",
+                learning_objectives: "",
+                prerequisites: ""
+            });
             loadData('courses');
-            showToast("Course created", "success");
-        } catch (err) {
-            showToast("Failed to create course", "error");
+            showToast("Course created successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to create course", "error");
         } finally {
             setFormLoading(false);
         }
@@ -712,21 +761,46 @@ export const useAdminData = () => {
 
     const handleEditCourseSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!editCourseForm.name || !editCourseForm.name.trim()) {
+            showToast("Course name is required", "error");
+            return;
+        }
         setFormLoading(true);
         try {
             const token = localStorage.getItem("snagup_token");
             await axios.put(`${API_ENDPOINTS.COURSES}/${editCourseForm.id}`, {
-                name: editCourseForm.name,
-                description: editCourseForm.description
+                name: editCourseForm.name.trim(),
+                category: editCourseForm.category || 'Software Development',
+                status: editCourseForm.status || 'active',
+                description: editCourseForm.description || '',
+                learning_objectives: editCourseForm.learning_objectives || '',
+                prerequisites: editCourseForm.prerequisites || ''
             }, { headers: { Authorization: `Bearer ${token}` } });
             setShowEditCourseModal(false);
             loadData('courses');
-            showToast("Course updated", "success");
-        } catch (err) {
-            showToast("Failed to update course", "error");
+            showToast("Course updated successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update course", "error");
         } finally {
             setFormLoading(false);
         }
+    };
+
+    const handleToggleCourseStatus = async (courseId: number, currentStatus: string) => {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.COURSES}/${courseId}/status`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+            loadData('courses');
+            showToast(`Course status updated to ${newStatus.toUpperCase()}`, "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update course status", "error");
+        }
+    };
+
+    const handleViewCourse = (course: any) => {
+        setViewCourseData(course);
+        setShowViewCourseModal(true);
     };
 
     const handleCreateInstructor = async (e: React.FormEvent) => {
@@ -1044,6 +1118,57 @@ export const useAdminData = () => {
         }
     };
 
+    const handleToggleUserStatus = async (userId: number, currentStatus: number | boolean) => {
+        const nextStatus = (currentStatus === 1 || currentStatus === true) ? 0 : 1;
+        const actionName = nextStatus === 1 ? "activate" : "deactivate";
+        if (!confirm(`Are you sure you want to ${actionName} this student account?`)) return;
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.USERS}/${userId}/status`, { is_active: nextStatus }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setStudents(prev => prev.map(s => s.id === userId ? { ...s, is_active: nextStatus } : s));
+            showToast(`Student account ${actionName}d successfully`, "success");
+        } catch (err: any) {
+            showToast("Failed to update student account status", "error");
+        }
+    };
+
+    const handleAdminEnrollStudent = async (studentId: number, courseId: number) => {
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.post(`${API_ENDPOINTS.ENROLLMENTS}/admin`, {
+                student_id: studentId,
+                course_id: courseId
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const newEnr = res.data.enrollment;
+            if (newEnr) {
+                setStudents(prev => prev.map(s => {
+                    if (s.id === studentId) {
+                        const existingEnrs = s.enrollments || [];
+                        return {
+                            ...s,
+                            enrollment_count: (s.enrollment_count || 0) + 1,
+                            enrollments: [newEnr, ...existingEnrs]
+                        };
+                    }
+                    return s;
+                }));
+                setEnrollments(prev => [newEnr, ...prev]);
+            }
+
+            showToast("Student enrolled successfully", "success");
+            return { success: true, message: "Student enrolled successfully", enrollment: newEnr };
+        } catch (err: any) {
+            const errMsg = err.response?.data?.error || "Failed to enroll student.";
+            showToast(errMsg, "error");
+            return { success: false, error: errMsg };
+        }
+    };
+
     const handleOfficialClose = async (batchId: number) => {
         if (!confirm("OFFICIAL CLOSURE: Hide from students?")) return;
         try {
@@ -1320,20 +1445,22 @@ export const useAdminData = () => {
         certBatchFilter, setCertBatchFilter,
         dateRange, setDateRange, chartCourseFilter, setChartCourseFilter, chartBatchFilter, setChartBatchFilter,
         customStartDate, setCustomStartDate, customEndDate, setCustomEndDate, chartData,
+        courseSearch, setCourseSearch, courseStatusFilter, setCourseStatusFilter,
+        showViewCourseModal, setShowViewCourseModal, viewCourseData, setViewCourseData,
 
         // Filtered Data
-        filteredBatches, filteredPayments, filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, emailLogs,
+        filteredCourses, filteredBatches, filteredPayments, filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, emailLogs,
         filteredCertificates,
 
         // Actions
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, handleSaveGeneralSettings,
         handleUpdateDeadline, showToast, fetchAttendanceData,
-        handleCreateCourse, handleEditCourseSubmit, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
+        handleCreateCourse, handleEditCourseSubmit, handleToggleCourseStatus, handleViewCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, handleBulkEnrollmentAction,
         handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings,
         handleSaveNotifSettings, handleDeleteCourse, handleEndBatch,
-        handleDeleteUser, handleOfficialClose, handleGenerateCert, handleAdminReleaseCert, releaseCertModal, setReleaseCertModal, openEnrollmentsModal,
+        handleDeleteUser, handleToggleUserStatus, handleAdminEnrollStudent, handleOfficialClose, handleGenerateCert, handleAdminReleaseCert, releaseCertModal, setReleaseCertModal, openEnrollmentsModal,
         openCertModal, preloadDropdowns, handleChangePassword, openEditDeadline,
         handleSelectAllBatches, handleToggleBatchSelection, handleStartBatch, handleLogoUpload, handleFaviconUpload,
         getLocalDatetime, setToast, setAttendanceData, handleDeleteCertificate, handleExport

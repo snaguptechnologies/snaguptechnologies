@@ -25,6 +25,9 @@ interface AdminModalsProps {
     setShowEditDeadlineModal: (show: boolean) => void;
     showEditCourseModal: boolean;
     setShowEditCourseModal: (show: boolean) => void;
+    showViewCourseModal?: boolean;
+    setShowViewCourseModal?: (show: boolean) => void;
+    viewCourseData?: any;
 
     // Forms
     courseForm: any;
@@ -68,6 +71,16 @@ interface AdminModalsProps {
     formLoading: boolean;
 }
 
+const CATEGORY_OPTIONS = [
+    "Software Development",
+    "Backend & Application Development",
+    "Data & Artificial Intelligence",
+    "Cloud & Web3 Technologies",
+    "Hardware Engineering",
+    "Cybersecurity",
+    "General"
+];
+
 const AdminModals: React.FC<AdminModalsProps> = (props) => {
     const {
         showCourseModal, setShowCourseModal,
@@ -77,6 +90,7 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
         showEnrollmentModal, setShowEnrollmentModal,
         showCertModal, setShowCertModal,
         showEditDeadlineModal, setShowEditDeadlineModal,
+        showViewCourseModal, setShowViewCourseModal, viewCourseData,
         courseForm, setCourseForm,
         instForm, setInstForm,
         batchForm, setBatchForm,
@@ -95,52 +109,199 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
 
     return (
         <>
+            {/* ADD COURSE MODAL */}
             {showCourseModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowCourseModal(false)}>
-                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowCourseModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <div className="mb-8">
-                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">New Program</h2>
-                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Architectural Deployment</p>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-xl relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowCourseModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <BookOpen className="w-6 h-6 text-primary" /> Add New Course
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Continuous Academic Curriculum Definition</p>
                         </div>
-                        <form onSubmit={handleCreateCourse} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                        <form onSubmit={handleCreateCourse} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Title</label>
-                                <input required value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="e.g. FULLSTACK NEURAL ENG" />
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Course Name *</label>
+                                <input required value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold placeholder:text-muted-foreground/30 text-sm" placeholder="e.g. Java Programming" />
                             </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Category</label>
+                                    <select value={courseForm.category || 'Software Development'} onChange={e => setCourseForm({ ...courseForm, category: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        {CATEGORY_OPTIONS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Initial Status</label>
+                                    <select value={courseForm.status || 'active'} onChange={e => setCourseForm({ ...courseForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active (Available for Enrollment)</option>
+                                        <option value="inactive">Inactive (Disabled for Registration)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Descriptor</label>
-                                <textarea value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all min-h-[140px] font-bold placeholder:text-muted-foreground/30" placeholder="Define program objectives..." />
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description</label>
+                                <textarea value={courseForm.description} onChange={e => setCourseForm({ ...courseForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[90px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Provide a comprehensive course overview..." />
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
-                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> AUTHORIZE DEPLOYMENT</>}
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Learning Objectives</label>
+                                <textarea value={courseForm.learning_objectives} onChange={e => setCourseForm({ ...courseForm, learning_objectives: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[70px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Key skills & outcomes students will master..." />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Prerequisites</label>
+                                <textarea value={courseForm.prerequisites} onChange={e => setCourseForm({ ...courseForm, prerequisites: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[70px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Recommended background or foundation required..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> CREATE COURSE</>}
                             </button>
                         </form>
                     </div>
                 </div>
             )}
 
+            {/* EDIT COURSE MODAL */}
             {showEditCourseModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditCourseModal(false)}>
-                    <div className="admin-card p-6 md:p-10 w-full max-w-md relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowEditCourseModal(false)} className="absolute top-6 right-6 md:top-8 md:right-8 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
-                        <div className="mb-8">
-                            <h2 className="text-3xl font-black text-foreground tracking-tighter mb-2 uppercase">Edit Program</h2>
-                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Architectural Refinement</p>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-xl relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowEditCourseModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-primary" /> Edit Course
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">
+                                SNAG-C{editCourseForm.id ? editCourseForm.id.toString().padStart(3, '0') : ''} Configuration
+                            </p>
                         </div>
-                        <form onSubmit={handleEditCourseSubmit} className="space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                        <form onSubmit={handleEditCourseSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Program Title</label>
-                                <input required value={editCourseForm.name} onChange={e => setEditCourseForm({ ...editCourseForm, name: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all font-bold placeholder:text-muted-foreground/30" placeholder="e.g. FULLSTACK NEURAL ENG" />
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Course Name *</label>
+                                <input required value={editCourseForm.name} onChange={e => setEditCourseForm({ ...editCourseForm, name: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold placeholder:text-muted-foreground/30 text-sm" placeholder="e.g. Java Programming" />
                             </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Category</label>
+                                    <select value={editCourseForm.category || 'Software Development'} onChange={e => setEditCourseForm({ ...editCourseForm, category: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        {CATEGORY_OPTIONS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Status</label>
+                                    <select value={editCourseForm.status || 'active'} onChange={e => setEditCourseForm({ ...editCourseForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active (Available for Enrollment)</option>
+                                        <option value="inactive">Inactive (Disabled for Registration)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div>
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2 opacity-70">Descriptor</label>
-                                <textarea value={editCourseForm.description} onChange={e => setEditCourseForm({ ...editCourseForm, description: e.target.value })} className="w-full px-5 py-4 bg-muted/20 border border-border/50 rounded-2xl text-foreground focus:outline-none focus:border-foreground/30 transition-all min-h-[140px] font-bold placeholder:text-muted-foreground/30" placeholder="Define program objectives..." />
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description</label>
+                                <textarea value={editCourseForm.description} onChange={e => setEditCourseForm({ ...editCourseForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[90px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Provide a comprehensive course overview..." />
                             </div>
-                            <button type="submit" disabled={formLoading} className="w-full py-5 bg-foreground text-background hover:opacity-90 rounded-2xl font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-foreground/10 text-xs tracking-[0.2em] sticky bottom-0">
-                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><FileText className="w-5 h-5" /> SAVE REVISIONS</>}
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Learning Objectives</label>
+                                <textarea value={editCourseForm.learning_objectives} onChange={e => setEditCourseForm({ ...editCourseForm, learning_objectives: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[70px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Key skills & outcomes students will master..." />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Prerequisites</label>
+                                <textarea value={editCourseForm.prerequisites} onChange={e => setEditCourseForm({ ...editCourseForm, prerequisites: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[70px] font-medium text-sm placeholder:text-muted-foreground/30" placeholder="Recommended background or foundation required..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> SAVE CHANGES</>}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* VIEW COURSE DETAILS MODAL */}
+            {showViewCourseModal && viewCourseData && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowViewCourseModal && setShowViewCourseModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-2xl relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowViewCourseModal && setShowViewCourseModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        
+                        {/* HEADER */}
+                        <div className="mb-6 border-b border-border/20 pb-4">
+                            <div className="flex items-center gap-3 mb-2">
+                                <span className="px-2.5 py-1 bg-muted/40 text-foreground border border-border/30 rounded-lg text-xs font-mono font-bold tracking-wider">
+                                    SNAG-C{viewCourseData.id.toString().padStart(3, '0')}
+                                </span>
+                                {viewCourseData.status === 'active' ? (
+                                    <span className="px-3 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase tracking-wider">
+                                        Active
+                                    </span>
+                                ) : (
+                                    <span className="px-3 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase tracking-wider">
+                                        Inactive
+                                    </span>
+                                )}
+                            </div>
+                            <h2 className="text-2xl font-black text-foreground tracking-tight">{viewCourseData.name}</h2>
+                            <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">{viewCourseData.category || 'Software Development'}</p>
+                        </div>
+
+                        {/* DETAILED CONTENT */}
+                        <div className="space-y-5 overflow-y-auto custom-scrollbar pr-1 text-sm">
+                            {/* METRICS ROW */}
+                            <div className="grid grid-cols-2 gap-4 bg-muted/20 p-4 rounded-xl border border-border/20">
+                                <div>
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Enrolled Students</span>
+                                    <div className="text-xl font-black text-primary flex items-center gap-1.5">
+                                        <Users className="w-5 h-5" /> {viewCourseData.enrolled_students || 0}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-70">Created Date</span>
+                                    <div className="text-sm font-bold text-foreground flex items-center gap-1.5 mt-1">
+                                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                                        {viewCourseData.created_at ? new Date(viewCourseData.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* DESCRIPTION */}
+                            <div>
+                                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Course Description</h4>
+                                <p className="text-foreground/90 font-medium leading-relaxed bg-muted/10 p-4 rounded-xl border border-border/20">
+                                    {viewCourseData.description || 'No description provided for this course.'}
+                                </p>
+                            </div>
+
+                            {/* LEARNING OBJECTIVES */}
+                            <div>
+                                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Learning Objectives</h4>
+                                <p className="text-foreground/90 font-medium leading-relaxed bg-muted/10 p-4 rounded-xl border border-border/20 whitespace-pre-line">
+                                    {viewCourseData.learning_objectives || 'No explicit learning objectives specified.'}
+                                </p>
+                            </div>
+
+                            {/* PREREQUISITES */}
+                            <div>
+                                <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Prerequisites</h4>
+                                <p className="text-foreground/90 font-medium leading-relaxed bg-muted/10 p-4 rounded-xl border border-border/20 whitespace-pre-line">
+                                    {viewCourseData.prerequisites || 'No prior prerequisites required.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* MODAL FOOTER */}
+                        <div className="mt-6 border-t border-border/20 pt-4 flex justify-end">
+                            <button
+                                onClick={() => setShowViewCourseModal && setShowViewCourseModal(false)}
+                                className="px-6 py-2.5 bg-foreground text-background hover:opacity-90 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+                            >
+                                Close Details
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -18,23 +18,8 @@ router.post('/', authenticateToken, requireRole('student'), async (req, res) => 
         const batch = batchRows[0];
         if (!batch) return res.status(404).json({ error: 'Batch not found' });
 
-        if (batch.is_finalized) {
-            return res.status(400).json({ error: 'Enrollment for this batch is permanently closed (Finalized).' });
-        }
-        if (batch.batch_status !== 'active') {
-            return res.status(400).json({ error: `Enrollment is only open for active batches. This batch is currently '${batch.batch_status}'.` });
-        }
-        if (batch.enrollment_status !== 'open') {
-            return res.status(400).json({ error: 'Enrollment has been manually closed for this batch' });
-        }
+        // SnagUp Skill Platform - Courses remain available continuously for registration without batch deadlines or status blocks.
 
-        if (batch.enrollment_end_date) {
-            const deadline = new Date(batch.enrollment_end_date);
-            const now = new Date();
-            if (now > deadline) {
-                return res.status(400).json({ error: `Enrollment for this batch closed on ${batch.enrollment_end_date}` });
-            }
-        }
 
         connection = await db.getConnection();
         await connection.beginTransaction();
@@ -83,6 +68,82 @@ router.post('/', authenticateToken, requireRole('student'), async (req, res) => 
         }
         console.error('Enrollment Error:', err);
         res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// POST /api/enrollments/admin - admin only (direct student enrollment)
+router.post('/admin', authenticateToken, requireRole('admin'), async (req, res) => {
+    const { student_id, course_id } = req.body;
+    if (!student_id || !course_id) {
+        return res.status(400).json({ error: 'Student ID and Course ID are required.' });
+    }
+
+    let connection;
+    try {
+        // Find default cohort for this course
+        const [batches] = await db.execute(`SELECT id FROM batches WHERE course_id = ? ORDER BY id ASC LIMIT 1`, [course_id]);
+        let batchId;
+        if (batches.length === 0) {
+            const [courseRows] = await db.execute(`SELECT name FROM courses WHERE id = ?`, [course_id]);
+            const courseName = courseRows[0]?.name || 'Course';
+            const [newBatch] = await db.execute(`
+                INSERT INTO batches (course_id, name, batch_status, enrollment_status, duration_days, price)
+                VALUES (?, ?, 'active', 'open', 0, 0)
+            `, [course_id, `${courseName} - Default Cohort`]);
+            batchId = newBatch.insertId;
+        } else {
+            batchId = batches[0].id;
+        }
+
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // Check if student is already enrolled in this course
+        const [existingEnrollments] = await connection.execute(
+            `SELECT e.id, e.status FROM enrollments e JOIN batches b ON e.batch_id = b.id WHERE e.student_id = ? AND b.course_id = ?`,
+            [student_id, course_id]
+        );
+
+        if (existingEnrollments.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({ error: 'Student is already enrolled in this course.' });
+        }
+
+        const txId = `ADMIN-ENR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const [enrollmentResult] = await connection.execute(
+            `INSERT INTO enrollments (student_id, batch_id, status) VALUES (?, ?, 'approved')`,
+            [student_id, batchId]
+        );
+        const enrollmentId = enrollmentResult.insertId;
+
+        await connection.execute(`
+            INSERT INTO payments (enrollment_id, student_id, amount, payment_method, transaction_id, status)
+            VALUES (?, ?, 0, 'admin_direct', ?, 'completed')
+        `, [enrollmentId, student_id, txId]);
+
+        await connection.commit();
+
+        // Return the newly created enrollment details
+        const [newEnrollmentRows] = await db.execute(`
+            SELECT e.id as enrollment_id, e.batch_id, b.name as batch_name, c.id as course_id, c.name as course_name, e.status,
+            DATE_FORMAT(e.enrolled_at, '%Y-%m-%dT%H:%i:%sZ') as enrolled_at
+            FROM enrollments e
+            JOIN batches b ON e.batch_id = b.id
+            JOIN courses c ON b.course_id = c.id
+            WHERE e.id = ?
+        `, [enrollmentId]);
+
+        res.status(201).json({
+            message: 'Student enrolled successfully.',
+            enrollment: newEnrollmentRows[0]
+        });
+    } catch (err) {
+        if (connection) await connection.rollback();
+        console.error('Admin Enrollment Error:', err);
+        res.status(500).json({ error: 'Failed to enroll student.' });
     } finally {
         if (connection) connection.release();
     }
