@@ -9,11 +9,17 @@ export default function Root() {
   useEffect(() => {
     const user = localStorage.getItem("snagup_user");
     if (user) {
-      const { role } = JSON.parse(user);
-      router.replace(`/dashboard/${role}`);
-    } else {
-      router.replace("/home");
+      try {
+        const parsed = JSON.parse(user);
+        if (parsed?.role) {
+          router.replace(`/dashboard/${parsed.role}`);
+          return;
+        }
+      } catch (e) {
+        // Fall back to home if user data is corrupt
+      }
     }
+    router.replace("/home");
   }, [router]);
 
   return (

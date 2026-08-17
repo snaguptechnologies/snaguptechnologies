@@ -4,7 +4,7 @@ import React from 'react';
 import { 
     X, CheckCircle, Loader2, Users, BookOpen, Clock, 
     Layers, Search, AlertCircle, XCircle, User, 
-    Award, GraduationCap, Eye, EyeOff, FileText, Calendar 
+    Award, GraduationCap, Eye, EyeOff, FileText, Calendar, Trash2 
 } from 'lucide-react';
 
 interface AdminModalsProps {
@@ -28,6 +28,33 @@ interface AdminModalsProps {
     showViewCourseModal?: boolean;
     setShowViewCourseModal?: (show: boolean) => void;
     viewCourseData?: any;
+
+    // Module & Lesson Modals
+    showCreateModuleModal?: boolean;
+    setShowCreateModuleModal?: (show: boolean) => void;
+    showEditModuleModal?: boolean;
+    setShowEditModuleModal?: (show: boolean) => void;
+    showCreateLessonModal?: boolean;
+    setShowCreateLessonModal?: (show: boolean) => void;
+    showEditLessonModal?: boolean;
+    setShowEditLessonModal?: (show: boolean) => void;
+    deleteModuleConfirmModal?: any;
+    setDeleteModuleConfirmModal?: (data: any) => void;
+
+    moduleForm?: any;
+    setModuleForm?: (form: any) => void;
+    editModuleForm?: any;
+    setEditModuleForm?: (form: any) => void;
+    lessonForm?: any;
+    setLessonForm?: (form: any) => void;
+    editLessonForm?: any;
+    setEditLessonForm?: (form: any) => void;
+
+    handleCreateModuleSubmit?: (e: React.FormEvent) => void;
+    handleEditModuleSubmit?: (e: React.FormEvent) => void;
+    handleConfirmDeleteModule?: (moduleId: number) => void;
+    handleCreateLessonSubmit?: (e: React.FormEvent) => void;
+    handleEditLessonSubmit?: (e: React.FormEvent) => void;
 
     // Forms
     courseForm: any;
@@ -91,6 +118,17 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
         showCertModal, setShowCertModal,
         showEditDeadlineModal, setShowEditDeadlineModal,
         showViewCourseModal, setShowViewCourseModal, viewCourseData,
+        showCreateModuleModal, setShowCreateModuleModal,
+        showEditModuleModal, setShowEditModuleModal,
+        showCreateLessonModal, setShowCreateLessonModal,
+        showEditLessonModal, setShowEditLessonModal,
+        deleteModuleConfirmModal, setDeleteModuleConfirmModal,
+        moduleForm, setModuleForm,
+        editModuleForm, setEditModuleForm,
+        lessonForm, setLessonForm,
+        editLessonForm, setEditLessonForm,
+        handleCreateModuleSubmit, handleEditModuleSubmit,
+        handleConfirmDeleteModule, handleCreateLessonSubmit, handleEditLessonSubmit,
         courseForm, setCourseForm,
         instForm, setInstForm,
         batchForm, setBatchForm,
@@ -781,6 +819,244 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                                     {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Award className="w-4 h-4" /> Release Certificate</>}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* CREATE MODULE MODAL */}
+            {showCreateModuleModal && moduleForm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowCreateModuleModal && setShowCreateModuleModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowCreateModuleModal && setShowCreateModuleModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <Layers className="w-6 h-6 text-primary" /> Add Syllabus Module
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Define structural topic module</p>
+                        </div>
+                        <form onSubmit={handleCreateModuleSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Module Title *</label>
+                                <input required value={moduleForm.title || ''} onChange={e => setModuleForm && setModuleForm({ ...moduleForm, title: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" placeholder="e.g. Module 1: Core Fundamentals & Syntax" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Sequence Order *</label>
+                                    <input type="number" min={1} required value={moduleForm.sequence_order || 1} onChange={e => setModuleForm && setModuleForm({ ...moduleForm, sequence_order: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Status</label>
+                                    <select value={moduleForm.status || 'active'} onChange={e => setModuleForm && setModuleForm({ ...moduleForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description</label>
+                                <textarea value={moduleForm.description || ''} onChange={e => setModuleForm && setModuleForm({ ...moduleForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[90px] font-medium text-sm" placeholder="Provide an overview of key concepts taught in this module..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> CREATE MODULE</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT MODULE MODAL */}
+            {showEditModuleModal && editModuleForm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditModuleModal && setShowEditModuleModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowEditModuleModal && setShowEditModuleModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-primary" /> Edit Module
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Update module details & ordering</p>
+                        </div>
+                        <form onSubmit={handleEditModuleSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Module Title *</label>
+                                <input required value={editModuleForm.title || ''} onChange={e => setEditModuleForm && setEditModuleForm({ ...editModuleForm, title: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" placeholder="e.g. Module 1: Core Fundamentals" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Sequence Order *</label>
+                                    <input type="number" min={1} required value={editModuleForm.sequence_order || 1} onChange={e => setEditModuleForm && setEditModuleForm({ ...editModuleForm, sequence_order: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Status</label>
+                                    <select value={editModuleForm.status || 'active'} onChange={e => setEditModuleForm && setEditModuleForm({ ...editModuleForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description</label>
+                                <textarea value={editModuleForm.description || ''} onChange={e => setEditModuleForm && setEditModuleForm({ ...editModuleForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[90px] font-medium text-sm" placeholder="Overview of key concepts..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> SAVE CHANGES</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE LESSON MODAL */}
+            {showCreateLessonModal && lessonForm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowCreateLessonModal && setShowCreateLessonModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowCreateLessonModal && setShowCreateLessonModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <BookOpen className="w-6 h-6 text-primary" /> Add Lesson / Topic
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Add specific learning lesson or resource</p>
+                        </div>
+                        <form onSubmit={handleCreateLessonSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Lesson Title *</label>
+                                <input required value={lessonForm.title || ''} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, title: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" placeholder="e.g. Lesson 1: Introduction & Variables" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Sequence Order *</label>
+                                    <input type="number" min={1} required value={lessonForm.sequence_order || 1} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, sequence_order: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Status</label>
+                                    <select value={lessonForm.status || 'active'} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Resource URL (Optional)</label>
+                                <input type="url" value={lessonForm.resource_url || ''} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, resource_url: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-medium text-sm" placeholder="https://docs.snagup.com/resources/pdf" />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Video Tutorial URL (Optional)</label>
+                                <input type="url" value={lessonForm.video_url || ''} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, video_url: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-medium text-sm" placeholder="https://youtube.com/watch?v=..." />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description / Content</label>
+                                <textarea value={lessonForm.description || ''} onChange={e => setLessonForm && setLessonForm({ ...lessonForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[80px] font-medium text-sm" placeholder="Topic overview or instructions..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> CREATE LESSON</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT LESSON MODAL */}
+            {showEditLessonModal && editLessonForm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowEditLessonModal && setShowEditLessonModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-foreground/10 bg-card flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowEditLessonModal && setShowEditLessonModal(false)} className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1 uppercase flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-primary" /> Edit Lesson / Topic
+                            </h2>
+                            <p className="text-[10px] text-muted-foreground tracking-widest uppercase font-bold opacity-60">Update lesson content & resource links</p>
+                        </div>
+                        <form onSubmit={handleEditLessonSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Lesson Title *</label>
+                                <input required value={editLessonForm.title || ''} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, title: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" placeholder="e.g. Lesson 1: Introduction" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Sequence Order *</label>
+                                    <input type="number" min={1} required value={editLessonForm.sequence_order || 1} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, sequence_order: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Status</label>
+                                    <select value={editLessonForm.status || 'active'} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, status: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-bold text-sm">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Resource URL (Optional)</label>
+                                <input type="url" value={editLessonForm.resource_url || ''} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, resource_url: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-medium text-sm" placeholder="https://docs.snagup.com/resources/pdf" />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Video Tutorial URL (Optional)</label>
+                                <input type="url" value={editLessonForm.video_url || ''} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, video_url: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all font-medium text-sm" placeholder="https://youtube.com/watch?v=..." />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1 opacity-80">Description / Content</label>
+                                <textarea value={editLessonForm.description || ''} onChange={e => setEditLessonForm && setEditLessonForm({ ...editLessonForm, description: e.target.value })} className="w-full px-4 py-3 bg-muted/20 border border-border/50 rounded-xl text-foreground focus:outline-none focus:border-primary transition-all min-h-[80px] font-medium text-sm" placeholder="Topic overview..." />
+                            </div>
+
+                            <button type="submit" disabled={formLoading} className="w-full py-4 bg-foreground text-background hover:opacity-90 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-xl shadow-foreground/10 text-xs tracking-[0.2em] mt-4">
+                                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" strokeWidth={3} /> : <><CheckCircle className="w-5 h-5" /> SAVE CHANGES</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* DELETE MODULE CONFIRMATION MODAL */}
+            {deleteModuleConfirmModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setDeleteModuleConfirmModal && setDeleteModuleConfirmModal(null)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-md relative shadow-2xl border-rose-500/20 bg-card flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="mb-6 flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
+                                <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-foreground uppercase tracking-tight">Delete Module?</h3>
+                                <p className="text-xs text-rose-500 font-bold uppercase tracking-wider">Warning: Cascading Delete</p>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-6 bg-muted/20 p-4 rounded-xl border border-border/30">
+                            Are you sure you want to delete module <strong className="text-foreground">{deleteModuleConfirmModal.title}</strong>? All lessons and topics associated with this module will also be permanently deleted.
+                        </p>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteModuleConfirmModal && setDeleteModuleConfirmModal(null)}
+                                className="flex-1 py-3.5 bg-muted hover:bg-muted/80 text-foreground font-black text-xs rounded-xl uppercase tracking-wider"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={formLoading}
+                                onClick={() => {
+                                    if (handleConfirmDeleteModule) {
+                                        handleConfirmDeleteModule(deleteModuleConfirmModal.id);
+                                    }
+                                }}
+                                className="flex-1 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-black text-xs rounded-xl uppercase tracking-wider shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2"
+                            >
+                                {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> Delete Module</>}
+                            </button>
                         </div>
                     </div>
                 </div>

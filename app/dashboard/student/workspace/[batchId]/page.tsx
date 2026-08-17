@@ -18,7 +18,10 @@ import {
     ArrowRight,
     User,
     PenLine,
-    CalendarCheck
+    CalendarCheck,
+    ChevronDown,
+    ChevronRight,
+    Link as LinkIcon
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import axios from "axios";
@@ -63,7 +66,39 @@ export default function CourseWorkspacePage() {
     const [error, setError] = useState("");
     const [markingRead, setMarkingRead] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'classroom' | 'resources'>('classroom');
+    const [activeTab, setActiveTab] = useState<'classroom' | 'resources' | 'syllabus'>('classroom');
+
+    // Student Syllabus state
+    const [studentSyllabus, setStudentSyllabus] = useState<any>(null);
+    const [syllabusLoading, setSyllabusLoading] = useState(false);
+    const [expandedModules, setExpandedModules] = useState<{ [key: number]: boolean }>({});
+
+    const toggleModuleExpand = (moduleId: number) => {
+        setExpandedModules(prev => ({
+            ...prev,
+            [moduleId]: !prev[moduleId]
+        }));
+    };
+
+    useEffect(() => {
+        if (batch?.course_id && activeTab === 'syllabus' && !studentSyllabus) {
+            const fetchStudentSyllabus = async () => {
+                setSyllabusLoading(true);
+                try {
+                    const token = localStorage.getItem("snagup_token");
+                    const res = await axios.get(`${API_ENDPOINTS.SYLLABUS}/student/course/${batch.course_id}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setStudentSyllabus(res.data);
+                } catch (err) {
+                    console.error("Failed to load student syllabus", err);
+                } finally {
+                    setSyllabusLoading(false);
+                }
+            };
+            fetchStudentSyllabus();
+        }
+    }, [batch?.course_id, activeTab, studentSyllabus]);
 
     const handleMarkAsRead = async () => {
         try {
@@ -213,6 +248,17 @@ export default function CourseWorkspacePage() {
                     >
                         <FileText className={`w-4 h-4 ${activeTab === 'resources' ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                         Resources
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('syllabus')}
+                        className={`flex items-center gap-3 px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                            activeTab === 'syllabus'
+                                ? "bg-background text-primary shadow-xl shadow-primary/5 border border-primary/10 scale-[1.02]"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                    >
+                        <BookOpen className={`w-4 h-4 ${activeTab === 'syllabus' ? 'text-primary' : 'text-muted-foreground'}`} />
+                        Syllabus & Curriculum
                     </button>
                 </div>
 

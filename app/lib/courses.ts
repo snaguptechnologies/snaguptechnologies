@@ -187,5 +187,167 @@ export const UPCOMING_LEARNING_CLUSTERS: CourseItem[] = [
         skillLevel: "Advanced",
         admissionStatus: "open",
         duration: "8 Weeks"
+    },
+
+    // New Required Individual Courses
+    {
+        id: 18,
+        name: "Advanced Backend",
+        category: "Backend & Application Development",
+        description: "Master high-scale REST APIs, microservices architecture, API security, OAuth2, rate limiting, and system design patterns.",
+        iconName: "Server",
+        skillLevel: "Advanced",
+        admissionStatus: "open",
+        duration: "8 Weeks"
+    },
+    {
+        id: 19,
+        name: "Deep Learning",
+        category: "Data & Artificial Intelligence",
+        description: "Neural network architectures, PyTorch, TensorFlow, Convolutional Networks (CNNs), Transformers, and computer vision models.",
+        iconName: "Brain",
+        skillLevel: "Advanced",
+        admissionStatus: "open",
+        duration: "8 Weeks"
+    },
+    {
+        id: 20,
+        name: "Statistics Python",
+        category: "Data & Artificial Intelligence",
+        description: "Statistical computing with Python, SciPy, Statsmodels, hypothesis testing, probability distributions, and inferential analytics.",
+        iconName: "BarChart3",
+        skillLevel: "Intermediate",
+        admissionStatus: "open",
+        duration: "6 Weeks"
+    },
+    {
+        id: 21,
+        name: "Hardhat",
+        category: "Cloud & Web3 Technologies",
+        description: "Ethereum development environment, smart contract compilation, automated unit testing with Hardhat, deployment scripts, and debugging.",
+        iconName: "Code2",
+        skillLevel: "Intermediate",
+        admissionStatus: "open",
+        duration: "6 Weeks"
+    },
+    {
+        id: 22,
+        name: "Blockchain Basics",
+        category: "Cloud & Web3 Technologies",
+        description: "Foundational decentralized ledgers, cryptographic hashing, consensus mechanisms, transactions, wallet security, and Web3 fundamentals.",
+        iconName: "Globe",
+        skillLevel: "Beginner",
+        admissionStatus: "open",
+        duration: "6 Weeks"
     }
 ];
+
+export interface TrainingDomain {
+    id: string;
+    name: string;
+    description: string;
+    iconName: string;
+    badge?: string;
+    modules: string[];
+    courseIds: number[];
+}
+
+export const TRAINING_DOMAINS: TrainingDomain[] = [
+    {
+        id: "fullstack-java",
+        name: "Fullstack Java",
+        description: "Complete end-to-end enterprise application engineering path using Java, Spring Boot, REST APIs, frontend tools, databases, and AWS deployment.",
+        iconName: "FileCode",
+        badge: "Enterprise Standard",
+        modules: [
+            "Front end",
+            "Java",
+            "Java backend",
+            "Database",
+            "Advanced Backend – REST API",
+            "AWS"
+        ],
+        courseIds: [1, 3, 7, 11, 18, 15]
+    },
+    {
+        id: "fullstack-python",
+        name: "Fullstack Python",
+        description: "Modern fullstack development specialization featuring interactive frontends, Python core, FastAPI/Django backends, relational databases, REST APIs, and AWS Cloud.",
+        iconName: "Terminal",
+        badge: "High Demand",
+        modules: [
+            "Front end",
+            "Python",
+            "Python backend",
+            "Database",
+            "Advanced Backend – REST API",
+            "AWS"
+        ],
+        courseIds: [1, 2, 6, 11, 18, 15]
+    },
+    {
+        id: "aiml-aids",
+        name: "AIML, AIDS",
+        description: "Advanced Artificial Intelligence, Machine Learning, and Data Science learning path from basic Python data structures to Deep Learning models and Gen AI.",
+        iconName: "Brain",
+        badge: "AI Track",
+        modules: [
+            "Python",
+            "Front end",
+            "Data Science",
+            "Machine Learning",
+            "Deep Learning",
+            "Gen AI"
+        ],
+        courseIds: [2, 1, 14, 13, 19, 8]
+    },
+    {
+        id: "data-analyst",
+        name: "Data Analyst",
+        description: "Comprehensive business intelligence and analytics domain path focusing on Excel, relational databases, statistical Python, Power BI dashboards, and real-world projects.",
+        iconName: "BarChart3",
+        badge: "Analytics Track",
+        modules: [
+            "Excel",
+            "Database",
+            "Python",
+            "Statistics Python",
+            "Power BI",
+            "Advanced Project"
+        ],
+        courseIds: [11, 2, 20, 12, 14]
+    },
+    {
+        id: "web3-developer",
+        name: "Web 3 Developer",
+        description: "Decentralized application engineering domain path covering modern Web3 frontends, Python scripting, backend services, Web3 protocols, and Solidity smart contracts.",
+        iconName: "Globe",
+        badge: "Web3 Track",
+        modules: [
+            "Front end",
+            "Python",
+            "Backend",
+            "Web3",
+            "Web3 Frontend",
+            "Solidity"
+        ],
+        courseIds: [1, 2, 6, 16, 17, 18]
+    },
+    {
+        id: "smart-contract-developer",
+        name: "Smart Contract Developer",
+        description: "Specialized Ethereum and EVM blockchain engineering path covering foundational blockchain concepts, Solidity smart contracts, backend integration, and Hardhat development framework.",
+        iconName: "ShieldCheck",
+        badge: "Blockchain Track",
+        modules: [
+            "Front end",
+            "Python",
+            "Backend",
+            "Blockchain Basics",
+            "Solidity",
+            "Hardhat"
+        ],
+        courseIds: [1, 2, 6, 22, 17, 21]
+    }
+];
+

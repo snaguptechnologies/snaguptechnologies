@@ -23,6 +23,7 @@ import AttendanceTab from './components/AttendanceTab';
 import SettingsTab from './components/SettingsTab';
 import EmailsTab from './components/EmailsTab';
 import CertificatesTab from './components/CertificatesTab';
+import SyllabusTab from './components/SyllabusTab';
 import AdminModals from './components/AdminModals';
 import RejectionModal from './components/modals/RejectionModal';
 
@@ -291,21 +292,39 @@ export default function AdminDashboard() {
 
                             {/* COURSES TAB */}
                             {activeTab === 'courses' && (
-                                <CoursesTab 
-                                    courses={courses}
-                                    filteredCourses={filteredCourses}
-                                    tabLoading={tabLoading}
-                                    courseSearch={courseSearch}
-                                    setCourseSearch={setCourseSearch}
-                                    courseStatusFilter={courseStatusFilter}
-                                    setCourseStatusFilter={setCourseStatusFilter}
-                                    setShowCourseModal={setShowCourseModal}
-                                    handleDeleteCourse={handleDeleteCourse}
-                                    setShowEditCourseModal={setShowEditCourseModal}
-                                    setEditCourseForm={setEditCourseForm}
-                                    handleViewCourse={handleViewCourse}
-                                    handleToggleCourseStatus={handleToggleCourseStatus}
-                                />
+                                adminProps.selectedCourseForSyllabus ? (
+                                    <SyllabusTab 
+                                        course={adminProps.selectedCourseForSyllabus}
+                                        syllabusData={adminProps.syllabusData}
+                                        syllabusLoading={adminProps.syllabusLoading}
+                                        onBack={adminProps.closeSyllabusManager}
+                                        openCreateModuleModal={adminProps.openCreateModuleModal}
+                                        openEditModuleModal={adminProps.openEditModuleModal}
+                                        handleDeleteModule={adminProps.handleDeleteModule}
+                                        handleToggleModuleStatus={adminProps.handleToggleModuleStatus}
+                                        openCreateLessonModal={adminProps.openCreateLessonModal}
+                                        openEditLessonModal={adminProps.openEditLessonModal}
+                                        handleDeleteLesson={adminProps.handleDeleteLesson}
+                                        handleToggleLessonStatus={adminProps.handleToggleLessonStatus}
+                                    />
+                                ) : (
+                                    <CoursesTab 
+                                        courses={courses}
+                                        filteredCourses={filteredCourses}
+                                        tabLoading={tabLoading}
+                                        courseSearch={courseSearch}
+                                        setCourseSearch={setCourseSearch}
+                                        courseStatusFilter={courseStatusFilter}
+                                        setCourseStatusFilter={setCourseStatusFilter}
+                                        setShowCourseModal={setShowCourseModal}
+                                        handleDeleteCourse={handleDeleteCourse}
+                                        setShowEditCourseModal={setShowEditCourseModal}
+                                        setEditCourseForm={setEditCourseForm}
+                                        handleViewCourse={handleViewCourse}
+                                        handleToggleCourseStatus={handleToggleCourseStatus}
+                                        openSyllabusManager={adminProps.openSyllabusManager}
+                                    />
+                                )
                             )}
 
 

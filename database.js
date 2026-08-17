@@ -289,21 +289,30 @@ async function initializeTables() {
       console.warn("Migration warning:", mErr.message);
     }
 
-    // Seed all 13 courses & default batches
+    // Seed all 22 courses & default batches
     const targetCourses = [
-      { name: 'Introduction to C', category: 'Programming', description: 'Core C Programming Foundations, Memory Management & Data Structures' },
-      { name: 'Java Programming Language', category: 'Programming', description: 'Comprehensive Object-Oriented Java Programming & Enterprise Apps' },
-      { name: 'Data Analytics: Power BI', category: 'Data Science', description: 'Business Intelligence, Interactive Dashboards & Data Visualization' },
-      { name: 'Python Mastery', category: 'Programming', description: 'Full-Stack Python, Automation, Scripting & Advanced Development' },
-      { name: 'Frontend Technologies', category: 'Web Development', description: 'Modern HTML5, CSS3, JavaScript ES6+, React & Responsive UI Design' },
-      { name: 'Embedded Programming', category: 'Embedded Systems', description: 'Comprehensive Embedded Systems, Microcontrollers & IoT Engineering' },
-      { name: 'Prompt Engineering', category: 'Artificial Intelligence', description: 'Generative AI Prompt Design, Fine-tuning & LLM Application Workflows' },
-      { name: 'VLSI Design', category: 'Hardware Engineering', description: 'Verilog, Semiconductor Design, FPGA & Digital Circuit Architecture' },
-      { name: 'FullStack Development', category: 'Web Development', description: 'End-to-End Modern Web Apps with Node.js, Express, React & Databases' },
-      { name: 'Hi-Tech Agriculture', category: 'AgriTech', description: 'Smart Farming, IoT Sensors, Automated Irrigation & Precision Agri-Tech' },
-      { name: 'Remote Sensing & GIS Programs', category: 'Geospatial Tech', description: 'Spatial Analysis, Satellite Image Processing & GIS Mapping Systems' },
-      { name: 'Generative AI (Gen AI)', category: 'Artificial Intelligence', description: 'Deep Learning, LLMs, Diffusion Models & AI Application Building' },
-      { name: 'Machine Learning (ML)', category: 'Artificial Intelligence', description: 'Supervised & Unsupervised ML, Predictive Models & Neural Networks' },
+      { name: 'Frontend Development', category: 'Software Development', description: 'Modern HTML5, CSS3, JavaScript ES6+, React & Responsive UI Design' },
+      { name: 'Advanced Python Programming', category: 'Software Development', description: 'Object-Oriented Architecture, Metaprogramming, Async Workflows & System Design' },
+      { name: 'Java Programming', category: 'Software Development', description: 'Comprehensive Object-Oriented Java Programming & Enterprise Apps' },
+      { name: 'C Programming', category: 'Software Development', description: 'Core C Programming Foundations, Memory Management & Data Structures' },
+      { name: 'C++ Programming', category: 'Software Development', description: 'Modern C++17/20, STL Optimization, Templates & High Performance Code' },
+      { name: 'Python Backend Development', category: 'Backend & Application Development', description: 'REST APIs, FastAPI, Django, PostgreSQL & Async Microservices' },
+      { name: 'Java Backend Development', category: 'Backend & Application Development', description: 'Spring Boot 3, Microservices Architecture, Hibernate & Security' },
+      { name: 'Generative AI & Prompt Engineering', category: 'Backend & Application Development', description: 'Generative AI Prompt Design, Fine-tuning, RAG & LLM Application Workflows' },
+      { name: 'VLSI Design & Development', category: 'Backend & Application Development', description: 'Verilog HDL, Semiconductor Design, FPGA & Digital Circuit Architecture' },
+      { name: 'Embedded Systems Programming', category: 'Backend & Application Development', description: 'Comprehensive Embedded C Systems, ARM Microcontrollers & IoT Hardware' },
+      { name: 'Database Management Systems', category: 'Data & Artificial Intelligence', description: 'Relational SQL, Query Optimization, Indexing, Transactions & NoSQL' },
+      { name: 'Data Analytics with Power BI', category: 'Data & Artificial Intelligence', description: 'Business Intelligence, DAX Queries & Interactive Dashboards' },
+      { name: 'Machine Learning', category: 'Data & Artificial Intelligence', description: 'Supervised & Unsupervised ML, Predictive Models & Neural Networks' },
+      { name: 'Data Science', category: 'Data & Artificial Intelligence', description: 'Pandas, Statistical Analysis, Predictive Analytics & Data Visualizations' },
+      { name: 'AWS Cloud Computing', category: 'Cloud & Web3 Technologies', description: 'AWS Cloud Architecture, EC2, S3, Serverless Lambda & DevOps' },
+      { name: 'Web3 Development', category: 'Cloud & Web3 Technologies', description: 'Decentralized Applications (dApps), Ethers.js, IPFS & Blockchain Clients' },
+      { name: 'Smart Contract Development', category: 'Cloud & Web3 Technologies', description: 'Ethereum EVM Solidity Programming, Security Audits & Token Standards' },
+      { name: 'Advanced Backend', category: 'Backend & Application Development', description: 'Master REST API architecture, microservices design, performance optimization, rate limiting, and system design patterns' },
+      { name: 'Deep Learning', category: 'Data & Artificial Intelligence', description: 'Neural network architectures, PyTorch, TensorFlow, CNNs, Transformers, and computer vision models' },
+      { name: 'Statistics Python', category: 'Data & Artificial Intelligence', description: 'Statistical computing with Python, SciPy, Statsmodels, hypothesis testing, probability distributions, and inferential analytics' },
+      { name: 'Hardhat', category: 'Cloud & Web3 Technologies', description: 'Ethereum development environment, smart contract compilation, automated unit testing with Hardhat, deployment scripts, and debugging' },
+      { name: 'Blockchain Basics', category: 'Cloud & Web3 Technologies', description: 'Foundational decentralized ledgers, cryptographic hashing, consensus mechanisms, transactions, wallet security, and Web3 fundamentals' }
     ];
 
     for (const cData of targetCourses) {

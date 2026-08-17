@@ -10,13 +10,13 @@ import Hero3DAsset from "@/components/Hero3DAsset";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 import { cn } from "@/lib/utils";
-import { UPCOMING_LEARNING_CLUSTERS, CourseItem } from "@/app/lib/courses";
+import { UPCOMING_LEARNING_CLUSTERS, TRAINING_DOMAINS, CourseItem, TrainingDomain } from "@/app/lib/courses";
 import {
     BookOpen, Award, Users, BarChart3,
     ArrowRight, Shield, Zap, Globe, CheckCircle, Play,
     MessageSquare, Mail, Phone, Loader2, Layers, X, Search, Filter,
     Code, Code2, FileCode, Terminal, Layout, Cpu, Server, Sparkles, Sprout, Bot, Brain,
-    Binary, Database, LineChart, Cloud, ShieldCheck
+    Binary, Database, LineChart, Cloud, ShieldCheck, ChevronDown, ChevronUp, CheckCircle2
 } from "lucide-react";
 
 
@@ -173,7 +173,7 @@ export default function HomePage() {
         college_name: "",
         college_register_id: "",
         whatsapp_number: "",
-        course: "Embedded Programming"
+        course: UPCOMING_LEARNING_CLUSTERS[0]?.name || "Frontend Development"
     });
     const [submittingApp, setSubmittingApp] = useState(false);
     const [appSubmitted, setAppSubmitted] = useState(false);
@@ -181,6 +181,7 @@ export default function HomePage() {
     // Course Search & Category Filter
     const [courseSearch, setCourseSearch] = useState("");
     const [courseCategoryFilter, setCourseCategoryFilter] = useState("All");
+    const [selectedDomain, setSelectedDomain] = useState<TrainingDomain | null>(null);
 
     const renderCourseIcon = (iconName: string) => {
         switch (iconName) {
@@ -665,9 +666,14 @@ export default function HomePage() {
                                 {UPCOMING_LEARNING_CLUSTERS.filter((course) => {
                                     const matchesCat = courseCategoryFilter === "All" || course.category === courseCategoryFilter;
                                     const q = courseSearch.toLowerCase().trim();
-                                    const matchesQ = !q || course.name.toLowerCase().includes(q) ||
-                                                             course.description.toLowerCase().includes(q) ||
-                                                             course.category.toLowerCase().includes(q);
+                                    const matchesQ = !q ||
+                                        course.name.toLowerCase().includes(q) ||
+                                        course.description.toLowerCase().includes(q) ||
+                                        course.category.toLowerCase().includes(q) ||
+                                        TRAINING_DOMAINS.some(d => d.courseIds.includes(course.id) && (
+                                            d.name.toLowerCase().includes(q) ||
+                                            d.modules.some(m => m.toLowerCase().includes(q))
+                                        ));
                                     return matchesCat && matchesQ;
                                 }).map((courseItem, i) => {
                                     return (
@@ -743,6 +749,203 @@ export default function HomePage() {
                                     </button>
                                 </div>
                             )}
+
+                            {/* ── TRAINING DOMAINS / LEARNING DOMAINS SECTION ── */}
+                            <div className="mt-24 pt-16 border-t border-border/40">
+                                <FadeIn className="text-center mb-12">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-3">
+                                        <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Industry Specializations</p>
+                                    </div>
+                                    <h3 className="text-3xl md:text-4xl font-black text-foreground mb-3 leading-tight tracking-tight">
+                                        Industrial Oriented <span className="text-gradient">Training Domains</span>
+                                    </h3>
+                                    <p className="text-muted-foreground max-w-2xl mx-auto text-xs md:text-sm leading-relaxed">
+                                        Explore domain-driven curriculum paths crafted for career readiness. Click any domain card to view its complete module sequence and connected courses.
+                                    </p>
+                                </FadeIn>
+
+                                {/* DOMAIN CARDS GRID (6 DOMAINS FROM PDF) */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {TRAINING_DOMAINS.map((domain, index) => {
+                                        const isSelected = selectedDomain?.id === domain.id;
+                                        return (
+                                            <FadeIn key={domain.id} delay={Math.min(index * 0.05, 0.3)}>
+                                                <div 
+                                                    onClick={() => setSelectedDomain(isSelected ? null : domain)}
+                                                    className={cn(
+                                                        "group relative glass-panel rounded-3xl border p-6 transition-all duration-300 cursor-pointer flex flex-col justify-between h-full overflow-hidden",
+                                                        isSelected
+                                                            ? "border-primary bg-primary/5 shadow-xl shadow-primary/10"
+                                                            : "border-border/40 bg-card/40 hover:border-primary/40 hover:bg-card/70 hover:shadow-lg hover:-translate-y-1"
+                                                    )}
+                                                >
+                                                    <div>
+                                                        {/* Badge & Icon */}
+                                                        <div className="flex items-center justify-between gap-3 mb-4">
+                                                            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
+                                                                {renderCourseIcon(domain.iconName)}
+                                                            </div>
+                                                            {domain.badge && (
+                                                                <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                                                                    {domain.badge}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Domain Name & Description */}
+                                                        <h4 className="text-xl font-black text-foreground mb-2 group-hover:text-primary transition-colors">
+                                                            {domain.name}
+                                                        </h4>
+                                                        <p className="text-xs text-muted-foreground leading-relaxed mb-5 line-clamp-3">
+                                                            {domain.description}
+                                                        </p>
+
+                                                        {/* PDF Modules List */}
+                                                        <div className="mb-6">
+                                                            <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2.5 flex items-center gap-1.5">
+                                                                <Layers className="w-3 h-3 text-primary" /> Included Modules ({domain.modules.length}):
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {domain.modules.map((mod, idx) => (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className="px-2.5 py-1 rounded-lg bg-muted/60 border border-border/40 text-[10px] font-bold text-foreground hover:border-primary/40 transition-colors"
+                                                                    >
+                                                                        {mod}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Card Footer Button */}
+                                                    <div className="pt-4 border-t border-border/20 flex items-center justify-between">
+                                                        <span className="text-[11px] font-bold text-primary flex items-center gap-1">
+                                                            {isSelected ? "Hide Learning Path" : "Explore Complete Path"}
+                                                        </span>
+                                                        <div className={cn(
+                                                            "w-7 h-7 rounded-full flex items-center justify-center border transition-all duration-300",
+                                                            isSelected ? "bg-primary text-primary-foreground border-primary rotate-180" : "bg-muted/40 border-border/40 text-muted-foreground group-hover:text-primary group-hover:border-primary/40"
+                                                        )}>
+                                                            <ChevronDown className="w-4 h-4" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </FadeIn>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* DOMAIN DETAILS INLINE VIEW */}
+                                <AnimatePresence>
+                                    {selectedDomain && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20, height: 0 }}
+                                            animate={{ opacity: 1, y: 0, height: "auto" }}
+                                            exit={{ opacity: 0, y: -20, height: 0 }}
+                                            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                                            className="mt-8 overflow-hidden"
+                                        >
+                                            <div className="glass-panel rounded-3xl border border-primary/30 bg-card/90 backdrop-blur-2xl p-6 md:p-8 shadow-2xl relative">
+                                                {/* Close Button */}
+                                                <button
+                                                    onClick={() => setSelectedDomain(null)}
+                                                    className="absolute top-6 right-6 p-2 rounded-xl bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
+
+                                                {/* Header */}
+                                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6 pr-12">
+                                                    <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0">
+                                                        {renderCourseIcon(selectedDomain.iconName)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="text-2xl md:text-3xl font-black text-foreground">
+                                                                {selectedDomain.name}
+                                                            </h4>
+                                                            {selectedDomain.badge && (
+                                                                <span className="px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                                                                    {selectedDomain.badge}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs md:text-sm text-muted-foreground mt-1 max-w-3xl">
+                                                            {selectedDomain.description}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Module Roadmap Sequence */}
+                                                <div className="mb-8 p-5 rounded-2xl bg-muted/30 border border-border/40">
+                                                    <h5 className="text-xs font-black uppercase tracking-widest text-primary mb-3 flex items-center gap-2">
+                                                        <CheckCircle2 className="w-4 h-4" /> Domain Module Sequence ({selectedDomain.modules.length} Modules)
+                                                    </h5>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                                                        {selectedDomain.modules.map((mod, idx) => (
+                                                            <div key={idx} className="p-3 rounded-xl bg-card border border-border/60 text-center relative flex flex-col justify-center">
+                                                                <span className="text-[9px] font-extrabold text-primary uppercase tracking-widest block mb-1">
+                                                                    Module {idx + 1}
+                                                                </span>
+                                                                <span className="text-xs font-bold text-foreground leading-snug">
+                                                                    {mod}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Linked Courses Grid */}
+                                                <div>
+                                                    <h5 className="text-xs font-black uppercase tracking-widest text-foreground mb-4">
+                                                        Individual Courses in {selectedDomain.name} Path ({selectedDomain.courseIds.length})
+                                                    </h5>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                        {UPCOMING_LEARNING_CLUSTERS
+                                                            .filter(c => selectedDomain.courseIds.includes(c.id))
+                                                            .map((courseItem) => (
+                                                                <div
+                                                                    key={courseItem.id}
+                                                                    className="p-5 rounded-2xl border border-border/40 bg-card/60 hover:border-primary/40 hover:bg-card transition-all flex flex-col justify-between"
+                                                                >
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2.5 mb-2">
+                                                                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                                                                {renderCourseIcon(courseItem.iconName)}
+                                                                            </div>
+                                                                            <span className="text-[10px] font-extrabold text-primary uppercase tracking-wider truncate">
+                                                                                {courseItem.category.replace("Development", "").replace("Technologies", "")}
+                                                                            </span>
+                                                                        </div>
+                                                                        <h6 className="text-sm font-black text-foreground mb-1">
+                                                                            {courseItem.name}
+                                                                        </h6>
+                                                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                                                                            {courseItem.description}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="pt-3 border-t border-border/20 flex items-center justify-between">
+                                                                        <span className="text-[10px] font-bold text-muted-foreground bg-muted/40 px-2 py-0.5 rounded">
+                                                                            {courseItem.duration || '6-8 Weeks'}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => handleJoinBatch(courseItem)}
+                                                                            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-bold text-[10px] uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1 shadow-sm"
+                                                                        >
+                                                                            Join Batch <ArrowRight className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </div>
                     </section>
                 )}

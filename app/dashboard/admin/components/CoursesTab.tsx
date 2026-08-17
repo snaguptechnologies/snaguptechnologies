@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, Loader2, Trash2, Edit2, Search, Eye, Power, BookOpen, Users, CheckCircle, XCircle, Filter } from 'lucide-react';
+import { Plus, Loader2, Trash2, Edit2, Search, Eye, Power, BookOpen, Users, CheckCircle, XCircle, Filter, Layers } from 'lucide-react';
 
 interface CoursesTabProps {
     courses: any[];
@@ -17,6 +17,7 @@ interface CoursesTabProps {
     setEditCourseForm: (form: any) => void;
     handleViewCourse: (course: any) => void;
     handleToggleCourseStatus: (id: number, currentStatus: string) => void;
+    openSyllabusManager?: (course: any) => void;
 }
 
 const CoursesTab: React.FC<CoursesTabProps> = ({
@@ -32,7 +33,8 @@ const CoursesTab: React.FC<CoursesTabProps> = ({
     setShowEditCourseModal,
     setEditCourseForm,
     handleViewCourse,
-    handleToggleCourseStatus
+    handleToggleCourseStatus,
+    openSyllabusManager
 }) => {
     const displayCourses = filteredCourses || courses || [];
 
@@ -173,6 +175,17 @@ const CoursesTab: React.FC<CoursesTabProps> = ({
                                                 >
                                                     <Eye className="w-4 h-4" /> View
                                                 </button>
+
+                                                {/* SYLLABUS */}
+                                                {openSyllabusManager && (
+                                                    <button
+                                                        onClick={() => openSyllabusManager(course)}
+                                                        className="p-2.5 rounded-xl text-primary bg-primary/5 hover:bg-primary/10 transition-all border border-primary/20 flex items-center gap-1 text-[11px] font-bold"
+                                                        title="Manage Course Syllabus & Modules"
+                                                    >
+                                                        <Layers className="w-4 h-4" /> Syllabus
+                                                    </button>
+                                                )}
 
                                                 {/* EDIT */}
                                                 <button
