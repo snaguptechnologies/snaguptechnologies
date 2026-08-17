@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Mail, Instagram, Linkedin, MessageSquare, ArrowRight, Globe, Shield, Zap } from "lucide-react";
+import { Mail, Instagram, Linkedin, MessageSquare, ArrowRight, Globe, Shield, Zap, Phone, MapPin, Navigation } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import ThreeBackground from "@/components/ThreeBackground";
 import BrandLogo from "@/components/BrandLogo";
@@ -10,7 +10,15 @@ import BrandLogo from "@/components/BrandLogo";
 export default function ContactPage() {
     const contactLinks = [
         {
-            name: "Gmail",
+            name: "Phone / WhatsApp",
+            value: "+91 82703 03995",
+            icon: <Phone className="w-6 h-6" />,
+            href: "tel:+918270303995",
+            color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+            hover: "hover:bg-emerald-500 hover:text-white"
+        },
+        {
+            name: "Official Email",
             value: "snaguptechnologies@gmail.com",
             icon: <Mail className="w-6 h-6" />,
             href: "mailto:snaguptechnologies@gmail.com",
@@ -35,7 +43,7 @@ export default function ContactPage() {
         }
     ];
 
-
+    const googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=565C4+-+B,+Ganesh+Nagar,+Thattankulam,+Sivagiripatti,+Palani+-+624601,+Tamil+Nadu,+India";
 
     return (
         <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
@@ -86,6 +94,34 @@ export default function ContactPage() {
 
                     {/* Right Column: Contact Cards */}
                     <div className="grid gap-6">
+                        {/* Office Location Card */}
+                        <motion.div
+                            initial={{ opacity: 0, x: 40 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.6 }}
+                            className="p-8 rounded-[32px] border border-amber-500/20 bg-amber-500/5 backdrop-blur-md relative overflow-hidden"
+                        >
+                            <div className="flex items-start gap-5 mb-4">
+                                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                                    <MapPin className="w-7 h-7" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-widest text-amber-500 mb-1">Company Headquarters</p>
+                                    <h3 className="text-lg font-bold text-foreground leading-snug">
+                                        565C4 - B, Ganesh Nagar, Thattankulam, Sivagiripatti, Palani - 624601, Tamil Nadu, India
+                                    </h3>
+                                </div>
+                            </div>
+                            <a
+                                href={googleMapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-500 text-black font-black text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow-md shadow-amber-500/10"
+                            >
+                                Get Directions <Navigation className="w-4 h-4" />
+                            </a>
+                        </motion.div>
+
                         {contactLinks.map((link, i) => (
                             <motion.a
                                 key={link.name}
@@ -94,7 +130,7 @@ export default function ContactPage() {
                                 rel="noopener noreferrer"
                                 initial={{ opacity: 0, x: 40 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6, delay: i * 0.1 }}
+                                transition={{ duration: 0.6, delay: (i + 1) * 0.1 }}
                                 className={`group relative p-8 rounded-[32px] border transition-all duration-500 backdrop-blur-md overflow-hidden ${link.color}`}
                             >
                                 <div className="relative z-10 flex items-center justify-between">
