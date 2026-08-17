@@ -324,7 +324,7 @@ async function initializeTables() {
       ['site_url', 'http://localhost:3000'],
       ['site_logo', 'https://snagup.com/logo.png'],
       ['contact_email', 'snaguptechnologies@gmail.com'],
-      ['contact_phone', '+91 98765 43210'],
+      ['contact_phone', '+91 82703 03995'],
       ['site_description', 'Premium LMS Platform by Snagup Technologies'],
       ['site_keywords', 'lms, education, snagup, courses, training'],
       ['favicon_url', ''],

@@ -990,16 +990,27 @@ export default function HomePage() {
                                     ))}
                                 </div>
 
-                                <div className="flex flex-wrap gap-10 opacity-60">
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mail</p>
-                                        <p className="text-sm font-bold text-foreground">snaguptechnologies@gmail.com</p>
+                                <div className="space-y-4 pt-2">
+                                    <div className="flex flex-wrap gap-8">
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Phone / WhatsApp</p>
+                                            <p className="text-sm font-bold text-foreground">+91 82703 03995</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mail</p>
+                                            <p className="text-sm font-bold text-foreground">snaguptechnologies@gmail.com</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Instagram</p>
+                                            <p className="text-sm font-bold text-foreground">@snaguptechnologies</p>
+                                        </div>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Instagram</p>
-                                        <p className="text-sm font-bold text-foreground">@snaguptechnologies</p>
+                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Headquarters</p>
+                                        <p className="text-xs font-semibold text-muted-foreground leading-relaxed">
+                                            565C4 - B, Ganesh Nagar, Thattankulam, Sivagiripatti, Palani - 624601, Tamil Nadu, India
+                                        </p>
                                     </div>
-
                                 </div>
                             </div>
                         </FadeIn>
@@ -1356,7 +1367,7 @@ export default function HomePage() {
                                                 <input 
                                                     type="tel" 
                                                     required
-                                                    placeholder="+91 98765 43210"
+                                                    placeholder="+91 82703 03995"
                                                     value={appFormData.phone} 
                                                     onChange={(e) => setAppFormData({ ...appFormData, phone: e.target.value, whatsapp_number: appFormData.whatsapp_number || e.target.value })}
                                                     className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:outline-none text-sm text-foreground transition-colors"
@@ -1367,7 +1378,7 @@ export default function HomePage() {
                                                 <input 
                                                     type="tel" 
                                                     required
-                                                    placeholder="+91 98765 43210"
+                                                    placeholder="+91 82703 03995"
                                                     value={appFormData.whatsapp_number} 
                                                     onChange={(e) => setAppFormData({ ...appFormData, whatsapp_number: e.target.value })}
                                                     className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-primary focus:outline-none text-sm text-foreground transition-colors"

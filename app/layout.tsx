@@ -23,6 +23,28 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "EducationalOrganization",
+              "name": "SnagUp Technologies",
+              "url": "https://snagup.com",
+              "logo": "https://snagup.com/brand-logo-v2.png",
+              "telephone": "+918270303995",
+              "email": "snaguptechnologies@gmail.com",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "565C4 - B, Ganesh Nagar, Thattankulam, Sivagiripatti",
+                "addressLocality": "Palani",
+                "addressRegion": "Tamil Nadu",
+                "postalCode": "624601",
+                "addressCountry": "IN"
+              }
+            })
+          }}
+        />
+        <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
