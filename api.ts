@@ -22,5 +22,6 @@ export const API_ENDPOINTS = {
     USERS: `${BASE_URL}/users`,
     APPLICATIONS: `${BASE_URL}/applications`,
     ACTIVITIES: `${BASE_URL}/applications/activities`,
+    SYLLABUS: `${BASE_URL}/syllabus`,
 };
 

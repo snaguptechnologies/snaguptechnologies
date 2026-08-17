@@ -77,6 +77,7 @@ app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/inquiries', require('./routes/inquiries'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/security', require('./routes/security'));
+app.use('/api/syllabus', require('./routes/syllabus'));
 
 
 // Health check

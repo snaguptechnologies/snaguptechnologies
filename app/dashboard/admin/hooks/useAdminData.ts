@@ -130,6 +130,22 @@ export const useAdminData = () => {
     const [courseSearch, setCourseSearch] = useState("");
     const [courseStatusFilter, setCourseStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
+    // Syllabus Management State
+    const [selectedCourseForSyllabus, setSelectedCourseForSyllabus] = useState<any>(null);
+    const [syllabusData, setSyllabusData] = useState<any>(null);
+    const [syllabusLoading, setSyllabusLoading] = useState(false);
+
+    const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
+    const [showEditModuleModal, setShowEditModuleModal] = useState(false);
+    const [showCreateLessonModal, setShowCreateLessonModal] = useState(false);
+    const [showEditLessonModal, setShowEditLessonModal] = useState(false);
+    const [deleteModuleConfirmModal, setDeleteModuleConfirmModal] = useState<any>(null);
+
+    const [moduleForm, setModuleForm] = useState({ title: "", description: "", sequence_order: 1, status: "active" });
+    const [editModuleForm, setEditModuleForm] = useState({ id: -1, title: "", description: "", sequence_order: 1, status: "active" });
+    const [lessonForm, setLessonForm] = useState({ moduleId: -1, title: "", description: "", resource_url: "", video_url: "", sequence_order: 1, status: "active" });
+    const [editLessonForm, setEditLessonForm] = useState({ id: -1, title: "", description: "", resource_url: "", video_url: "", sequence_order: 1, status: "active" });
+
     // Settings states
     const [profileForm, setProfileForm] = useState({ name: "", email: "", phone: "" });
     const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -803,6 +819,235 @@ export const useAdminData = () => {
         setShowViewCourseModal(true);
     };
 
+    // Syllabus Management Handlers
+    const fetchSyllabus = async (courseId: number) => {
+        setSyllabusLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.SYLLABUS}/course/${courseId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSyllabusData(res.data);
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to load syllabus", "error");
+        } finally {
+            setSyllabusLoading(false);
+        }
+    };
+
+    const openSyllabusManager = (course: any) => {
+        setSelectedCourseForSyllabus(course);
+        fetchSyllabus(course.id);
+    };
+
+    const closeSyllabusManager = () => {
+        setSelectedCourseForSyllabus(null);
+        setSyllabusData(null);
+    };
+
+    const openCreateModuleModal = (courseId: number) => {
+        const nextOrder = (syllabusData?.modules?.length || 0) + 1;
+        setModuleForm({ title: "", description: "", sequence_order: nextOrder, status: "active" });
+        setShowCreateModuleModal(true);
+    };
+
+    const openEditModuleModal = (mod: any) => {
+        setEditModuleForm({
+            id: mod.id,
+            title: mod.title,
+            description: mod.description || "",
+            sequence_order: mod.sequence_order || 1,
+            status: mod.status || "active"
+        });
+        setShowEditModuleModal(true);
+    };
+
+    const handleCreateModuleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!moduleForm.title || !moduleForm.title.trim()) {
+            return showToast("Module title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.post(`${API_ENDPOINTS.SYLLABUS}/course/${selectedCourseForSyllabus.id}/modules`, moduleForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowCreateModuleModal(false);
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Module created successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to create module", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleEditModuleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editModuleForm.title || !editModuleForm.title.trim()) {
+            return showToast("Module title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.SYLLABUS}/modules/${editModuleForm.id}`, editModuleForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowEditModuleModal(false);
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Module updated successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update module", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleDeleteModule = (moduleId: number) => {
+        const mod = syllabusData?.modules?.find((m: any) => m.id === moduleId);
+        if (mod) {
+            setDeleteModuleConfirmModal(mod);
+        }
+    };
+
+    const handleConfirmDeleteModule = async (moduleId: number) => {
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.delete(`${API_ENDPOINTS.SYLLABUS}/modules/${moduleId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setDeleteModuleConfirmModal(null);
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Module deleted successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to delete module", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleToggleModuleStatus = async (moduleId: number, currentStatus: string) => {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const mod = syllabusData?.modules?.find((m: any) => m.id === moduleId);
+        if (!mod) return;
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.SYLLABUS}/modules/${moduleId}`, {
+                ...mod,
+                status: newStatus
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast(`Module status updated to ${newStatus.toUpperCase()}`, "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update module status", "error");
+        }
+    };
+
+    const openCreateLessonModal = (moduleId: number) => {
+        const targetMod = syllabusData?.modules?.find((m: any) => m.id === moduleId);
+        const nextOrder = (targetMod?.lessons?.length || 0) + 1;
+        setLessonForm({ moduleId, title: "", description: "", resource_url: "", video_url: "", sequence_order: nextOrder, status: "active" });
+        setShowCreateLessonModal(true);
+    };
+
+    const openEditLessonModal = (lesson: any) => {
+        setEditLessonForm({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description || "",
+            resource_url: lesson.resource_url || "",
+            video_url: lesson.video_url || "",
+            sequence_order: lesson.sequence_order || 1,
+            status: lesson.status || "active"
+        });
+        setShowEditLessonModal(true);
+    };
+
+    const handleCreateLessonSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!lessonForm.title || !lessonForm.title.trim()) {
+            return showToast("Lesson title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.post(`${API_ENDPOINTS.SYLLABUS}/modules/${lessonForm.moduleId}/lessons`, lessonForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowCreateLessonModal(false);
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Lesson created successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to create lesson", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleEditLessonSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editLessonForm.title || !editLessonForm.title.trim()) {
+            return showToast("Lesson title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.SYLLABUS}/lessons/${editLessonForm.id}`, editLessonForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowEditLessonModal(false);
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Lesson updated successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update lesson", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleDeleteLesson = async (lessonId: number) => {
+        if (!confirm("Are you sure you want to delete this lesson?")) return;
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.delete(`${API_ENDPOINTS.SYLLABUS}/lessons/${lessonId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast("Lesson deleted successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to delete lesson", "error");
+        }
+    };
+
+    const handleToggleLessonStatus = async (lessonId: number, currentStatus: string) => {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        let targetLesson: any = null;
+        if (syllabusData?.modules) {
+            for (let m of syllabusData.modules) {
+                const found = m.lessons?.find((l: any) => l.id === lessonId);
+                if (found) {
+                    targetLesson = found;
+                    break;
+                }
+            }
+        }
+        if (!targetLesson) return;
+
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.SYLLABUS}/lessons/${lessonId}`, {
+                ...targetLesson,
+                status: newStatus
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            fetchSyllabus(selectedCourseForSyllabus.id);
+            showToast(`Lesson status updated to ${newStatus.toUpperCase()}`, "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update lesson status", "error");
+        }
+    };
+
     const handleCreateInstructor = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormLoading(true);
@@ -1448,6 +1693,19 @@ export const useAdminData = () => {
         courseSearch, setCourseSearch, courseStatusFilter, setCourseStatusFilter,
         showViewCourseModal, setShowViewCourseModal, viewCourseData, setViewCourseData,
 
+        // Syllabus State
+        selectedCourseForSyllabus, setSelectedCourseForSyllabus,
+        syllabusData, setSyllabusData, syllabusLoading, setSyllabusLoading,
+        showCreateModuleModal, setShowCreateModuleModal,
+        showEditModuleModal, setShowEditModuleModal,
+        showCreateLessonModal, setShowCreateLessonModal,
+        showEditLessonModal, setShowEditLessonModal,
+        deleteModuleConfirmModal, setDeleteModuleConfirmModal,
+        moduleForm, setModuleForm,
+        editModuleForm, setEditModuleForm,
+        lessonForm, setLessonForm,
+        editLessonForm, setEditLessonForm,
+
         // Filtered Data
         filteredCourses, filteredBatches, filteredPayments, filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, emailLogs,
         filteredCertificates,
@@ -1455,7 +1713,11 @@ export const useAdminData = () => {
         // Actions
         loadData, handleLogout, handleInquiryStatus, handleUpdateProfile, handleSaveGeneralSettings,
         handleUpdateDeadline, showToast, fetchAttendanceData,
-        handleCreateCourse, handleEditCourseSubmit, handleToggleCourseStatus, handleViewCourse, handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
+        handleCreateCourse, handleEditCourseSubmit, handleToggleCourseStatus, handleViewCourse,
+        openSyllabusManager, closeSyllabusManager, fetchSyllabus,
+        openCreateModuleModal, openEditModuleModal, handleCreateModuleSubmit, handleEditModuleSubmit, handleDeleteModule, handleConfirmDeleteModule, handleToggleModuleStatus,
+        openCreateLessonModal, openEditLessonModal, handleCreateLessonSubmit, handleEditLessonSubmit, handleDeleteLesson, handleToggleLessonStatus,
+        handleCreateInstructor, handleCreateBatch, handleEditBatchSubmit,
         handleToggleEnrollment, handleFinalizeBatch, handleArchiveBatch, handleEnrollmentAction, handleBulkEnrollmentAction,
         handleResetDatabase,
         handleDeleteBatch, handleBulkBatchUpdate, handleQrUpload, handleSaveUpiSettings,

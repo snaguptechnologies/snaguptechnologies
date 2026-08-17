@@ -281,6 +281,28 @@ async function initializeTables() {
         explanation_json TEXT,
         recommended_response VARCHAR(255),
         response_status ENUM('RECOMMENDED','SIMULATED','EXECUTED','DISMISSED') DEFAULT 'RECOMMENDED'
+      )`,
+      `CREATE TABLE IF NOT EXISTS course_modules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        course_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        sequence_order INT DEFAULT 1,
+        status ENUM('active','inactive') DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS course_lessons (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        module_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        resource_url VARCHAR(500),
+        video_url VARCHAR(500),
+        sequence_order INT DEFAULT 1,
+        status ENUM('active','inactive') DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE CASCADE
       )`
     ];
 
@@ -361,7 +383,12 @@ async function initializeTables() {
       { name: 'Data Science', category: 'Data & Artificial Intelligence', description: 'Pandas, Statistical Analysis, Predictive Analytics & Data Visualizations' },
       { name: 'AWS Cloud Computing', category: 'Cloud & Web3 Technologies', description: 'AWS Cloud Architecture, EC2, S3, Serverless Lambda & DevOps' },
       { name: 'Web3 Development', category: 'Cloud & Web3 Technologies', description: 'Decentralized Applications (dApps), Ethers.js, IPFS & Blockchain Clients' },
-      { name: 'Smart Contract Development', category: 'Cloud & Web3 Technologies', description: 'Ethereum EVM Solidity Programming, Security Audits & Token Standards' }
+      { name: 'Smart Contract Development', category: 'Cloud & Web3 Technologies', description: 'Ethereum EVM Solidity Programming, Security Audits & Token Standards' },
+      { name: 'Advanced Backend', category: 'Backend & Application Development', description: 'Master REST API architecture, microservices design, performance optimization, rate limiting, and system design patterns' },
+      { name: 'Deep Learning', category: 'Data & Artificial Intelligence', description: 'Neural network architectures, PyTorch, TensorFlow, CNNs, Transformers, and computer vision models' },
+      { name: 'Statistics Python', category: 'Data & Artificial Intelligence', description: 'Statistical computing with Python, SciPy, Statsmodels, hypothesis testing, probability distributions, and inferential analytics' },
+      { name: 'Hardhat', category: 'Cloud & Web3 Technologies', description: 'Ethereum development environment, smart contract compilation, automated unit testing with Hardhat, deployment scripts, and debugging' },
+      { name: 'Blockchain Basics', category: 'Cloud & Web3 Technologies', description: 'Foundational decentralized ledgers, cryptographic hashing, consensus mechanisms, transactions, wallet security, and Web3 fundamentals' }
     ];
 
     const approvedNames = targetCourses.map(c => c.name);
