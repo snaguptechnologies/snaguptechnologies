@@ -132,11 +132,20 @@ export default function HomePage() {
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [user, setUser] = useState<any>(null);
+    const [dynamicCourses, setDynamicCourses] = useState<any[]>(UPCOMING_LEARNING_CLUSTERS);
 
     useEffect(() => {
         setMounted(true);
         const u = localStorage.getItem("snagup_user");
         if (u) setUser(JSON.parse(u));
+
+        axios.get(API_ENDPOINTS.COURSES).then((res) => {
+            if (Array.isArray(res.data) && res.data.length > 0) {
+                setDynamicCourses(res.data);
+            }
+        }).catch(() => {
+            setDynamicCourses(UPCOMING_LEARNING_CLUSTERS);
+        });
     }, []);
 
     const handleCTA = () => {
@@ -166,14 +175,24 @@ export default function HomePage() {
 
     // Cohort Application Modal State
     const [showAppModal, setShowAppModal] = useState(false);
-    const [appFormData, setAppFormData] = useState({
+    const [appFormData, setAppFormData] = useState<{
+        name: string;
+        email: string;
+        phone: string;
+        college_name: string;
+        college_register_id: string;
+        whatsapp_number: string;
+        course: string;
+        course_id: number | null;
+    }>({
         name: "",
         email: "",
         phone: "",
         college_name: "",
         college_register_id: "",
         whatsapp_number: "",
-        course: UPCOMING_LEARNING_CLUSTERS[0]?.name || "Frontend Development"
+        course: UPCOMING_LEARNING_CLUSTERS[0]?.name || "Frontend Development",
+        course_id: UPCOMING_LEARNING_CLUSTERS[0]?.id || 1
     });
     const [submittingApp, setSubmittingApp] = useState(false);
     const [appSubmitted, setAppSubmitted] = useState(false);
@@ -211,9 +230,10 @@ export default function HomePage() {
         const u = localStorage.getItem("snagup_user");
 
         if (!token || !u) {
-            // User NOT logged in -> save selected course and redirect to Sign In / Login
+            // User NOT logged in -> save selected course id and name and redirect to Sign In / Login
+            localStorage.setItem("snagup_selected_course_id", String(courseItem.id));
             localStorage.setItem("snagup_selected_course", courseItem.name);
-            router.push("/login");
+            router.push(`/login?apply_course_id=${courseItem.id}`);
         } else {
             // User IS logged in -> open application form directly with pre-filled details
             let parsedUser: any = null;
@@ -226,7 +246,8 @@ export default function HomePage() {
                 college_name: "",
                 college_register_id: "",
                 whatsapp_number: parsedUser?.phone || user?.phone || "",
-                course: courseItem.name
+                course: courseItem.name,
+                course_id: courseItem.id
             });
             setAppSubmitted(false);
             setShowAppModal(true);
@@ -251,12 +272,15 @@ export default function HomePage() {
                 college_name: appFormData.college_name,
                 college_register_id: appFormData.college_register_id,
                 whatsapp_number: appFormData.whatsapp_number,
-                course_name: appFormData.course
+                course_name: appFormData.course,
+                course_id: appFormData.course_id
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             setAppSubmitted(true);
+            localStorage.removeItem("snagup_selected_course_id");
+            localStorage.removeItem("snagup_selected_course");
         } catch (err: any) {
             alert(err.response?.data?.error || "Failed to submit application. Please try again.");
         } finally {
@@ -304,17 +328,41 @@ export default function HomePage() {
                 handleVerify(undefined, idParam.toUpperCase());
             }
 
-            // Check if student selected a course prior to login
-            const savedCourse = localStorage.getItem("snagup_selected_course");
-            const urlCourse = params.get("apply_course");
-            const targetCourse = urlCourse || savedCourse;
+            // Check if student selected a course prior to login (Priority 1: apply_course_id, Priority 2: apply_course)
+            const savedCourseId = localStorage.getItem("snagup_selected_course_id");
+            const urlCourseId = params.get("apply_course_id");
+            const targetCourseIdStr = urlCourseId || savedCourseId;
+            const targetCourseId = targetCourseIdStr ? Number(targetCourseIdStr) : null;
+
+            const savedCourseName = localStorage.getItem("snagup_selected_course");
+            const urlCourseName = params.get("apply_course");
+            const targetCourseName = urlCourseName || savedCourseName;
 
             const token = localStorage.getItem("snagup_token");
             const u = localStorage.getItem("snagup_user");
 
-            if (targetCourse && token && u) {
+            if ((targetCourseId || targetCourseName) && token && u) {
                 let parsedUser: any = null;
                 try { parsedUser = JSON.parse(u); } catch (e) {}
+
+                let resolvedName = targetCourseName || "";
+                let resolvedId = targetCourseId;
+
+                const catalog = dynamicCourses.length > 0 ? dynamicCourses : UPCOMING_LEARNING_CLUSTERS;
+
+                if (targetCourseId) {
+                    const match = catalog.find((c: any) => Number(c.id) === targetCourseId);
+                    if (match) {
+                        resolvedName = match.name;
+                        resolvedId = Number(match.id);
+                    }
+                } else if (targetCourseName) {
+                    const match = catalog.find((c: any) => c.name?.toLowerCase() === targetCourseName.toLowerCase());
+                    if (match) {
+                        resolvedId = Number(match.id);
+                        resolvedName = match.name;
+                    }
+                }
 
                 setAppFormData({
                     name: parsedUser?.name || "",
@@ -323,10 +371,12 @@ export default function HomePage() {
                     college_name: "",
                     college_register_id: "",
                     whatsapp_number: parsedUser?.phone || "",
-                    course: targetCourse
+                    course: resolvedName || "Frontend Development",
+                    course_id: resolvedId
                 });
                 setAppSubmitted(false);
                 setShowAppModal(true);
+                localStorage.removeItem("snagup_selected_course_id");
                 localStorage.removeItem("snagup_selected_course");
             }
         }
@@ -335,7 +385,7 @@ export default function HomePage() {
         };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
-    }, [mounted]);
+    }, [mounted, dynamicCourses]);
 
 
     const [batches, setBatches] = useState<any[]>([]);
@@ -720,17 +770,27 @@ export default function HomePage() {
                                                     </div>
 
                                                     {/* Explore Course Button */}
-                                                    <button 
-                                                        onClick={() => handleJoinBatch(courseItem)}
+                                                    <Link 
+                                                        href={`/courses/${courseItem.id}`}
                                                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-foreground text-background rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-md shadow-foreground/5 hover:shadow-primary/20"
                                                     >
                                                         Explore Course <ArrowRight className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    </Link>
                                                 </div>
                                             </div>
                                         </FadeIn>
                                     );
                                 })}
+                            </div>
+
+                            {/* Explore All Courses Global CTA */}
+                            <div className="mt-12 text-center">
+                                <Link
+                                    href="/courses"
+                                    className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+                                >
+                                    Explore All Courses <ArrowRight className="w-4 h-4" />
+                                </Link>
                             </div>
 
                             {/* Empty Search State */}

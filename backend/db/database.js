@@ -303,6 +303,60 @@ async function initializeTables() {
         status ENUM('active','inactive') DEFAULT 'active',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS lesson_completions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        lesson_id INT NOT NULL,
+        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(student_id, lesson_id),
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (lesson_id) REFERENCES course_lessons(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS assessments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        course_id INT NOT NULL,
+        module_id INT DEFAULT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        pass_percentage INT DEFAULT 70,
+        time_limit_mins INT DEFAULT 0,
+        max_attempts INT DEFAULT 3,
+        status ENUM('active','inactive') DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+        FOREIGN KEY (module_id) REFERENCES course_modules(id) ON DELETE SET NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS assessment_questions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        assessment_id INT NOT NULL,
+        question_text TEXT NOT NULL,
+        question_type ENUM('mcq','tf') DEFAULT 'mcq',
+        options_json JSON NOT NULL,
+        correct_option_index INT NOT NULL,
+        points INT DEFAULT 1,
+        sequence_order INT DEFAULT 1,
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS assessment_attempts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        assessment_id INT NOT NULL,
+        student_id INT NOT NULL,
+        batch_id INT NOT NULL,
+        score_obtained INT DEFAULT 0,
+        total_points INT DEFAULT 0,
+        percentage DECIMAL(5,2) DEFAULT 0.00,
+        is_passed BOOLEAN DEFAULT 0,
+        attempt_number INT DEFAULT 1,
+        status ENUM('in_progress','completed') DEFAULT 'in_progress',
+        answers_json JSON DEFAULT NULL,
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        submitted_at DATETIME DEFAULT NULL,
+        UNIQUE(student_id, assessment_id, attempt_number),
+        INDEX idx_student_batch_assessment (student_id, batch_id, assessment_id),
+        FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
       )`
     ];
 

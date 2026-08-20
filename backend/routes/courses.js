@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/courses/:id - public, returns course + all its batches
+// GET /api/courses/:id - public, returns course + all its batches + active syllabus modules & lessons
 router.get('/:id', async (req, res) => {
   try {
     const [courseRows] = await db.execute(`SELECT * FROM courses WHERE id = ?`, [req.params.id]);
@@ -53,8 +53,26 @@ router.get('/:id', async (req, res) => {
       `, [newBatch.insertId]);
       batches = createdBatches;
     }
+
+    // Fetch active syllabus modules & lessons for public course detail display
+    const [modules] = await db.execute(`
+      SELECT id, course_id, title, description, sequence_order
+      FROM course_modules
+      WHERE course_id = ? AND status = 'active'
+      ORDER BY sequence_order ASC, id ASC
+    `, [course.id]);
+
+    for (let mod of modules) {
+      const [lessons] = await db.execute(`
+        SELECT id, module_id, title, description, resource_url, video_url, sequence_order
+        FROM course_lessons
+        WHERE module_id = ? AND status = 'active'
+        ORDER BY sequence_order ASC, id ASC
+      `, [mod.id]);
+      mod.lessons = lessons;
+    }
     
-    res.json({ ...course, batches });
+    res.json({ ...course, batches, modules });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch course details' });

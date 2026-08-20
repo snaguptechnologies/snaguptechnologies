@@ -21,12 +21,42 @@ import {
     CalendarCheck,
     ChevronDown,
     ChevronRight,
-    Link as LinkIcon
+    Link as LinkIcon,
+    CheckCircle,
+    CheckCircle2,
+    XCircle,
+    HelpCircle,
+    RotateCw,
+    Sparkles
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 import { LockKeyhole as Lock } from "lucide-react";
+
+const getEmbedUrl = (url: string) => {
+    if (!url) return null;
+    try {
+        if (url.includes('youtube.com/watch')) {
+            const videoId = new URL(url).searchParams.get('v');
+            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        }
+        if (url.includes('youtu.be/')) {
+            const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        }
+        if (url.includes('vimeo.com/')) {
+            const videoId = url.split('vimeo.com/')[1]?.split('?')[0];
+            if (videoId) return `https://player.vimeo.com/video/${videoId}`;
+        }
+        if (url.endsWith('.mp4') || url.endsWith('.webm')) {
+            return url;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+};
 
 const formatTo12Hr = (timeStr: string) => {
     if (!timeStr) return "";
@@ -66,7 +96,25 @@ export default function CourseWorkspacePage() {
     const [error, setError] = useState("");
     const [markingRead, setMarkingRead] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'classroom' | 'resources' | 'syllabus'>('classroom');
+    const [activeTab, setActiveTab] = useState<'classroom' | 'resources' | 'syllabus' | 'assessments'>('classroom');
+
+    // Student Assessment State
+    const [assessmentsData, setAssessmentsData] = useState<any>(null);
+    const [assessmentsLoading, setAssessmentsLoading] = useState(false);
+    const [assessmentsError, setAssessmentsError] = useState("");
+
+    // Active Test Execution State
+    const [activeTest, setActiveTest] = useState<any>(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: number }>({});
+    const [startingTestId, setStartingTestId] = useState<number | null>(null);
+    const [submittingTest, setSubmittingTest] = useState(false);
+    const [testError, setTestError] = useState("");
+    const [timeLeftSeconds, setTimeLeftSeconds] = useState<number | null>(null);
+
+    // Assessment Result Modal State
+    const [lastResult, setLastResult] = useState<any>(null);
+    const [showResultModal, setShowResultModal] = useState(false);
 
     // Student Syllabus state
     const [studentSyllabus, setStudentSyllabus] = useState<any>(null);
@@ -99,6 +147,176 @@ export default function CourseWorkspacePage() {
             fetchStudentSyllabus();
         }
     }, [batch?.course_id, activeTab, studentSyllabus]);
+
+    const [selectedLesson, setSelectedLesson] = useState<any>(null);
+    const [togglingLessonId, setTogglingLessonId] = useState<number | null>(null);
+    const [toggleError, setToggleError] = useState<string>("");
+
+    useEffect(() => {
+        if (studentSyllabus?.modules?.length > 0) {
+            const firstModule = studentSyllabus.modules[0];
+            setExpandedModules(prev => {
+                if (Object.keys(prev).length === 0 && firstModule?.id) {
+                    return { [firstModule.id]: true };
+                }
+                return prev;
+            });
+
+            if (!selectedLesson && firstModule.lessons?.length > 0) {
+                setSelectedLesson(firstModule.lessons[0]);
+            }
+        }
+    }, [studentSyllabus, selectedLesson]);
+
+    const handleToggleComplete = async (lessonId: number) => {
+        try {
+            setTogglingLessonId(lessonId);
+            setToggleError("");
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.post(
+                `${API_ENDPOINTS.SYLLABUS}/lessons/${lessonId}/toggle-complete`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const { completed, lesson_progress } = res.data;
+
+            setStudentSyllabus((prev: any) => {
+                if (!prev) return prev;
+                const updatedModules = prev.modules?.map((mod: any) => ({
+                    ...mod,
+                    lessons: mod.lessons?.map((les: any) =>
+                        les.id === lessonId ? { ...les, completed } : les
+                    )
+                }));
+                return {
+                    ...prev,
+                    modules: updatedModules,
+                    lesson_progress: lesson_progress || prev.lesson_progress
+                };
+            });
+
+            setSelectedLesson((prev: any) => {
+                if (prev && prev.id === lessonId) {
+                    return { ...prev, completed };
+                }
+                return prev;
+            });
+        } catch (err: any) {
+            console.error("Failed to toggle lesson completion", err);
+            setToggleError(err.response?.data?.error || "Failed to update completion status.");
+        } finally {
+            setTogglingLessonId(null);
+        }
+    };
+
+    // Assessment API Handlers
+    const fetchAssessments = async () => {
+        setAssessmentsLoading(true);
+        setAssessmentsError("");
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/student/batch/${batchId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAssessmentsData(res.data);
+        } catch (err: any) {
+            console.error("Failed to load assessments", err);
+            setAssessmentsError(err.response?.data?.error || "Failed to load assessments for this course.");
+        } finally {
+            setAssessmentsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (batchId && activeTab === 'assessments') {
+            fetchAssessments();
+        }
+    }, [batchId, activeTab]);
+
+    const handleStartTest = async (assessmentId: number) => {
+        setStartingTestId(assessmentId);
+        setTestError("");
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.post(`${API_ENDPOINTS.ASSESSMENTS}/${assessmentId}/start`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const test = res.data;
+            setActiveTest(test);
+            setCurrentQuestionIndex(0);
+            setSelectedAnswers({});
+
+            if (test.time_limit_mins > 0 && test.started_at) {
+                const startMs = new Date(test.started_at).getTime();
+                const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
+                const totalSec = test.time_limit_mins * 60;
+                const remainSec = Math.max(0, totalSec - elapsedSec);
+                setTimeLeftSeconds(remainSec);
+            } else {
+                setTimeLeftSeconds(null);
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || "Failed to start assessment.");
+        } finally {
+            setStartingTestId(null);
+        }
+    };
+
+    const handleSubmitTest = async () => {
+        if (!activeTest) return;
+        setSubmittingTest(true);
+        setTestError("");
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.post(`${API_ENDPOINTS.ASSESSMENTS}/${activeTest.assessment_id}/submit`, {
+                attempt_id: activeTest.attempt_id,
+                answers: selectedAnswers
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const result = res.data;
+            setLastResult({
+                ...result,
+                assessment_title: activeTest.assessment_title
+            });
+            setActiveTest(null);
+            setTimeLeftSeconds(null);
+            setShowResultModal(true);
+            fetchAssessments();
+        } catch (err: any) {
+            setTestError(err.response?.data?.error || "Failed to submit assessment.");
+        } finally {
+            setSubmittingTest(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!activeTest || timeLeftSeconds === null) return;
+        if (timeLeftSeconds <= 0) {
+            handleSubmitTest();
+            return;
+        }
+        const timer = setInterval(() => {
+            setTimeLeftSeconds(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [activeTest, timeLeftSeconds]);
+
+    const handleViewResult = async (assessmentId: number, attemptId: number) => {
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/${assessmentId}/result/${attemptId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setLastResult(res.data);
+            setShowResultModal(true);
+        } catch (err: any) {
+            alert(err.response?.data?.error || "Failed to load result.");
+        }
+    };
 
     const handleMarkAsRead = async () => {
         try {
@@ -259,6 +477,17 @@ export default function CourseWorkspacePage() {
                     >
                         <BookOpen className={`w-4 h-4 ${activeTab === 'syllabus' ? 'text-primary' : 'text-muted-foreground'}`} />
                         Syllabus & Curriculum
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('assessments')}
+                        className={`flex items-center gap-3 px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                            activeTab === 'assessments'
+                                ? "bg-background text-amber-500 shadow-xl shadow-amber-500/5 border border-amber-500/10 scale-[1.02]"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                    >
+                        <Award className={`w-4 h-4 ${activeTab === 'assessments' ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                        Assessments
                     </button>
                 </div>
 
@@ -455,7 +684,7 @@ export default function CourseWorkspacePage() {
                                 </section>
                             )}
                         </div>
-                    ) : (
+                    ) : activeTab === 'resources' ? (
                         <div className="space-y-12">
                             {/* Resource Channel (One-way Broadcast) */}
                             <section className="bg-card rounded-3xl border border-border overflow-hidden shadow-sm min-h-[600px] flex flex-col">
@@ -555,6 +784,284 @@ export default function CourseWorkspacePage() {
                                     </div>
                                 </footer>
                             </section>
+                        </div>
+                    ) : (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {/* Syllabus & Learning Workspace Tab */}
+                            
+                            {/* 1. Lesson Progress Bar & Header */}
+                            <div className="bg-card rounded-3xl border border-border p-6 lg:p-8 space-y-6 shadow-sm bg-gradient-to-br from-card to-muted/20">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                                            <BookOpen className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-black tracking-tight text-foreground uppercase">Curriculum Learning Workspace</h2>
+                                            <p className="text-xs text-muted-foreground font-medium">Master modules and complete video lessons at your own pace</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 bg-muted/40 px-5 py-3 rounded-2xl border border-border/50 self-stretch sm:self-auto justify-between">
+                                        <div>
+                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Curriculum Progress</p>
+                                            <p className="text-lg font-black font-mono text-primary">
+                                                {studentSyllabus?.lesson_progress?.completed || 0} / {studentSyllabus?.lesson_progress?.total || 0} <span className="text-xs text-muted-foreground font-normal">Lessons</span>
+                                            </p>
+                                        </div>
+                                        <div className="text-right pl-4 border-l border-border">
+                                            <p className="text-xl font-black font-mono text-primary">
+                                                {studentSyllabus?.lesson_progress?.percentage || 0}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="space-y-2">
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-primary transition-all duration-700 ease-out"
+                                            style={{ width: `${Math.min(studentSyllabus?.lesson_progress?.percentage || 0, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 2. Main Syllabus View Layout */}
+                            {syllabusLoading ? (
+                                <div className="py-20 text-center bg-card rounded-3xl border border-border flex flex-col items-center justify-center gap-4">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Loading Course Syllabus...</p>
+                                </div>
+                            ) : !studentSyllabus || !studentSyllabus.modules || studentSyllabus.modules.length === 0 ? (
+                                <div className="py-24 text-center bg-card rounded-3xl border border-border flex flex-col items-center justify-center gap-4 p-8">
+                                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                        <BookOpen className="w-8 h-8 text-muted-foreground/40" />
+                                    </div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">No Syllabus Content Available Yet</h3>
+                                    <p className="text-xs text-muted-foreground max-w-sm">Course modules and lessons will appear here as soon as the instructor uploads the curriculum.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                    
+                                    {/* Modules & Lessons Accordion List (Left Column) */}
+                                    <div className="lg:col-span-5 space-y-4">
+                                        <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Modules & Lessons</h3>
+                                        <div className="space-y-3">
+                                            {studentSyllabus.modules.map((mod: any, mIdx: number) => {
+                                                const isExpanded = !!expandedModules[mod.id];
+                                                const lessonCount = mod.lessons?.length || 0;
+                                                const completedCount = mod.lessons?.filter((l: any) => l.completed).length || 0;
+
+                                                return (
+                                                    <div key={mod.id} className="bg-card rounded-2xl border border-border overflow-hidden transition-all shadow-sm">
+                                                        {/* Module Header */}
+                                                        <button
+                                                            onClick={() => toggleModuleExpand(mod.id)}
+                                                            className="w-full p-4 flex items-start justify-between text-left hover:bg-muted/30 transition-colors gap-3"
+                                                        >
+                                                            <div className="space-y-1 flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                                                        Module {mIdx + 1}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-bold text-muted-foreground">
+                                                                        ({completedCount}/{lessonCount} Done)
+                                                                    </span>
+                                                                </div>
+                                                                <h4 className="text-sm font-bold text-foreground leading-tight truncate">{mod.title}</h4>
+                                                                {mod.description && (
+                                                                    <p className="text-xs text-muted-foreground line-clamp-1 font-medium">{mod.description}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="p-1 rounded-lg bg-muted/50 shrink-0 mt-1">
+                                                                {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                                                            </div>
+                                                        </button>
+
+                                                        {/* Lessons List inside Module */}
+                                                        {isExpanded && (
+                                                            <div className="border-t border-border/50 bg-muted/10 p-2 space-y-1">
+                                                                {mod.lessons && mod.lessons.length > 0 ? (
+                                                                    mod.lessons.map((les: any) => {
+                                                                        const isSelected = selectedLesson?.id === les.id;
+                                                                        return (
+                                                                            <button
+                                                                                key={les.id}
+                                                                                onClick={() => setSelectedLesson(les)}
+                                                                                className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all gap-3 text-xs ${
+                                                                                    isSelected
+                                                                                        ? "bg-primary text-primary-foreground font-bold shadow-md shadow-primary/20 scale-[1.01]"
+                                                                                        : "hover:bg-muted/60 text-foreground"
+                                                                                }`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                                                    {les.completed ? (
+                                                                                        <CheckCircle className={`w-4 h-4 shrink-0 ${isSelected ? 'text-primary-foreground' : 'text-emerald-500'}`} />
+                                                                                    ) : (
+                                                                                        <PlayCircle className={`w-4 h-4 shrink-0 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+                                                                                    )}
+                                                                                    <span className="truncate">{les.title}</span>
+                                                                                </div>
+                                                                                {les.completed && (
+                                                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shrink-0 ${
+                                                                                        isSelected ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                                                                    }`}>
+                                                                                        Completed
+                                                                                    </span>
+                                                                                )}
+                                                                            </button>
+                                                                        );
+                                                                    })
+                                                                ) : (
+                                                                    <p className="text-[11px] text-muted-foreground p-3 italic text-center">No lessons in this module yet.</p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Selected Lesson Content Viewer (Right Column) */}
+                                    <div className="lg:col-span-7 space-y-6">
+                                        <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Lesson Content</h3>
+
+                                        {selectedLesson ? (
+                                            <div className="bg-card rounded-3xl border border-border p-6 lg:p-8 space-y-6 shadow-sm">
+                                                {/* Lesson Header & Mark Complete Action */}
+                                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-border">
+                                                    <div className="space-y-1 flex-1">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                                                            Selected Lesson
+                                                        </span>
+                                                        <h3 className="text-xl font-bold text-foreground leading-snug">{selectedLesson.title}</h3>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => handleToggleComplete(selectedLesson.id)}
+                                                        disabled={togglingLessonId === selectedLesson.id}
+                                                        className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${
+                                                            selectedLesson.completed
+                                                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20"
+                                                                : "bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20"
+                                                        }`}
+                                                    >
+                                                        {togglingLessonId === selectedLesson.id ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : selectedLesson.completed ? (
+                                                            <>
+                                                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                                                Completed ✓
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CheckCircle className="w-4 h-4" />
+                                                                Mark as Complete
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+
+                                                {toggleError && (
+                                                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 text-xs font-medium flex items-center gap-2">
+                                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                                        {toggleError}
+                                                    </div>
+                                                )}
+
+                                                {/* Lesson Description */}
+                                                {selectedLesson.description && (
+                                                    <div className="space-y-2">
+                                                        <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Overview</h4>
+                                                        <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">{selectedLesson.description}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Embedded Video Player or Link */}
+                                                {selectedLesson.video_url ? (
+                                                    <div className="space-y-3 pt-2">
+                                                        <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                                                            <Video className="w-4 h-4 text-primary" /> Video Lecture
+                                                        </h4>
+                                                        {(() => {
+                                                            const embedUrl = getEmbedUrl(selectedLesson.video_url);
+                                                            if (embedUrl) {
+                                                                return (
+                                                                    <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-border shadow-inner">
+                                                                        <iframe
+                                                                            src={embedUrl}
+                                                                            title={selectedLesson.title}
+                                                                            className="w-full h-full border-0"
+                                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                            allowFullScreen
+                                                                        />
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <div className="p-4 bg-muted/40 border border-border rounded-2xl flex items-center justify-between gap-4">
+                                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                                        <Video className="w-5 h-5 text-primary shrink-0" />
+                                                                        <span className="text-xs font-bold truncate">{selectedLesson.video_url}</span>
+                                                                    </div>
+                                                                    <a
+                                                                        href={selectedLesson.video_url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold uppercase tracking-wider hover:opacity-90 shrink-0"
+                                                                    >
+                                                                        Open Video
+                                                                    </a>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                ) : null}
+
+                                                {/* Resource Attachment */}
+                                                {selectedLesson.resource_url ? (
+                                                    <div className="space-y-3 pt-2">
+                                                        <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                                                            <FileText className="w-4 h-4 text-emerald-500" /> Learning Material & Code
+                                                        </h4>
+                                                        <div className="p-4 bg-muted/40 border border-border rounded-2xl flex items-center justify-between gap-4">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <FileText className="w-5 h-5 text-emerald-500 shrink-0" />
+                                                                <span className="text-xs font-bold text-emerald-600 truncate">{selectedLesson.resource_url}</span>
+                                                            </div>
+                                                            <a
+                                                                href={selectedLesson.resource_url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 shrink-0 flex items-center gap-2"
+                                                            >
+                                                                <Upload className="w-3.5 h-3.5" />
+                                                                Open Resource
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                ) : null}
+
+                                                {!selectedLesson.video_url && !selectedLesson.resource_url && (
+                                                    <div className="p-8 text-center bg-muted/20 border border-dashed border-border rounded-2xl space-y-2">
+                                                        <BookOpen className="w-6 h-6 text-muted-foreground/30 mx-auto" />
+                                                        <p className="text-xs font-bold text-muted-foreground">No media or learning attachment attached to this lesson.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="p-16 text-center bg-card border border-border rounded-3xl space-y-3">
+                                                <BookOpen className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+                                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Select a lesson from the left panel to begin learning</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
