@@ -79,6 +79,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
         { title: "Courses", value: stats?.totalCourses || 0, icon: <BookOpen className="w-5 h-5" />, color: "text-emerald-500", bg: "bg-emerald-500/10" },
         { title: "Active Batches", value: stats?.activeBatches || 0, icon: <Layers className="w-5 h-5" />, color: "text-orange-500", bg: "bg-orange-500/10" },
         { title: "Inactive Batches", value: stats?.completedBatches || 0, icon: <Activity className="w-5 h-5" />, color: "text-slate-500", bg: "bg-slate-500/10" },
+        { title: "Assessments", value: `${stats?.totalAssessments || 0} (${stats?.globalPassRate || 0}%)`, icon: <CheckCircle className="w-5 h-5" />, color: "text-amber-500", bg: "bg-amber-500/10" },
     ];
 
     return (
@@ -92,7 +93,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
 
             {/* Performance Stats Cards - (Stats appearing first) */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {telemetryCards.map((card, idx) => (
                     <div key={idx} className="p-6 rounded-[2rem] bg-card border border-border/20 hover:border-foreground/10 transition-all group relative overflow-hidden">
                         <div className={`absolute -right-4 -bottom-4 w-16 h-16 ${card.bg} rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />

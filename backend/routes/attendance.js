@@ -101,8 +101,9 @@ router.get('/student/:student_id/batch/:batch_id/stats', authenticateToken, asyn
     }
 
     try {
-        const [batchRows] = await db.execute(`SELECT duration_days FROM batches WHERE id = ?`, [batch_id]);
+        const [batchRows] = await db.execute(`SELECT duration_days, course_id FROM batches WHERE id = ?`, [batch_id]);
         const totalClasses = batchRows[0]?.duration_days || 0;
+        const courseId = batchRows[0]?.course_id;
         
         const todayIST3 = new Date(Date.now() + 5.5 * 3600000).toISOString().split('T')[0];
         
@@ -111,11 +112,30 @@ router.get('/student/:student_id/batch/:batch_id/stats', authenticateToken, asyn
 
         const percentage = totalClasses > 0 ? ((attendedClasses / totalClasses) * 100).toFixed(2) : 0;
 
+        let assessmentsPassed = true;
+        if (courseId) {
+            const [assessmentsRows] = await db.execute('SELECT id FROM assessments WHERE course_id = ? AND status = "active"', [courseId]);
+            if (assessmentsRows.length > 0) {
+                const assessmentIds = assessmentsRows.map(row => row.id);
+                const placeholders = assessmentIds.map(() => '?').join(',');
+                const [passedRows] = await db.execute(`
+                    SELECT COUNT(DISTINCT assessment_id) as passed_count
+                    FROM assessment_attempts
+                    WHERE student_id = ? AND assessment_id IN (${placeholders}) AND is_passed = 1
+                `, [student_id, ...assessmentIds]);
+                
+                const passedCount = passedRows[0].passed_count || 0;
+                if (passedCount < assessmentsRows.length) {
+                    assessmentsPassed = false;
+                }
+            }
+        }
+
         res.json({
             totalClasses,
             attendedClasses,
             percentage: parseFloat(percentage),
-            eligibleForCertificate: parseFloat(percentage) >= 75
+            eligibleForCertificate: (parseFloat(percentage) >= 80) && assessmentsPassed
         });
     } catch (err) {
         console.error(err);

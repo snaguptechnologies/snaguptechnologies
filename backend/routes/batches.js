@@ -714,6 +714,23 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
     const attendedClasses = attRows[0].count;
     const percentage = totalClasses > 0 ? ((attendedClasses / totalClasses) * 100).toFixed(2) : 0;
 
+    let assessmentsPassed = true;
+    const [assessmentsRows] = await db.execute('SELECT id FROM assessments WHERE course_id = ? AND status = "active"', [batch.course_id]);
+    if (assessmentsRows.length > 0) {
+      const assessmentIds = assessmentsRows.map(row => row.id);
+      const placeholders = assessmentIds.map(() => '?').join(',');
+      const [passedRows] = await db.execute(`
+        SELECT COUNT(DISTINCT assessment_id) as passed_count
+        FROM assessment_attempts
+        WHERE student_id = ? AND assessment_id IN (${placeholders}) AND is_passed = 1
+      `, [studentId, ...assessmentIds]);
+      
+      const passedCount = passedRows[0].passed_count || 0;
+      if (passedCount < assessmentsRows.length) {
+         assessmentsPassed = false;
+      }
+    }
+
     res.json({
       ...batch,
       last_read_guideline_at: enrollment.last_read_guideline_at,
@@ -722,7 +739,7 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
         totalClasses,
         attendedClasses,
         percentage: parseFloat(percentage),
-        eligibleForCertificate: parseFloat(percentage) >= 75
+        eligibleForCertificate: (parseFloat(percentage) >= 80) && assessmentsPassed
       }
     });
 

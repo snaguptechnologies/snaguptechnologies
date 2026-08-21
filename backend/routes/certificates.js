@@ -34,7 +34,7 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
 
   const [detailsRows] = await db.execute(`
     SELECT s.name as student_name, s.email as student_email,
-      b.name as batch_name, co.name as course_name,
+      b.name as batch_name, co.name as course_name, co.id as course_id,
       u.name as instructor_name, b.batch_status, b.archived_at,
       (SELECT COUNT(*) FROM attendance WHERE student_id = e.student_id AND batch_id = e.batch_id AND status = 'present') as present_count,
       b.duration_days
@@ -61,6 +61,31 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
       success: false, 
       error: `Student progress (${studentPct}%) is below the required 80% threshold for automatic certificate generation.` 
     };
+  }
+
+  // Automatic eligibility requirement: Must pass all active assessments for the course
+  if (!is_admin_override) {
+    const [assessmentsRows] = await db.execute('SELECT id FROM assessments WHERE course_id = ? AND status = "active"', [details.course_id]);
+    const totalAssessments = assessmentsRows.length;
+    
+    if (totalAssessments > 0) {
+      const assessmentIds = assessmentsRows.map(row => row.id);
+      const placeholders = assessmentIds.map(() => '?').join(',');
+      
+      const [passedRows] = await db.execute(`
+        SELECT COUNT(DISTINCT assessment_id) as passed_count
+        FROM assessment_attempts
+        WHERE student_id = ? AND assessment_id IN (${placeholders}) AND is_passed = 1
+      `, [student_id, ...assessmentIds]);
+
+      const passedCount = passedRows[0].passed_count || 0;
+      if (passedCount < totalAssessments) {
+         return {
+           success: false,
+           error: \`Student has only passed \${passedCount} of \${totalAssessments} required course assessments.\`
+         };
+      }
+    }
   }
 
   // Company settings

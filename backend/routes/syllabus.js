@@ -288,6 +288,28 @@ router.get('/student/course/:courseId', authenticateToken, requireRole('student'
 
         const percentage = totalLessonsCount > 0 ? Math.round((completedLessonsCount / totalLessonsCount) * 100) : 0;
 
+        // Fetch Assessment Progress
+        const [assessmentsCountRows] = await db.execute(`
+            SELECT COUNT(id) as total_assessments
+            FROM assessments
+            WHERE course_id = ? AND status = 'active'
+        `, [courseId]);
+
+        const [passedAssessmentsRows] = await db.execute(`
+            SELECT COUNT(DISTINCT a.id) as passed_assessments
+            FROM assessments a
+            JOIN assessment_attempts aa ON a.id = aa.assessment_id
+            WHERE a.course_id = ? AND a.status = 'active' 
+              AND aa.student_id = ? AND aa.is_passed = 1
+        `, [courseId, studentId]);
+
+        const totalAssessments = assessmentsCountRows[0].total_assessments || 0;
+        const passedAssessments = passedAssessmentsRows[0].passed_assessments || 0;
+
+        const combinedTotal = totalLessonsCount + totalAssessments;
+        const combinedCompleted = completedLessonsCount + passedAssessments;
+        const combinedPercentage = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
+
         res.json({
             course,
             modules,
@@ -295,6 +317,15 @@ router.get('/student/course/:courseId', authenticateToken, requireRole('student'
                 completed: completedLessonsCount,
                 total: totalLessonsCount,
                 percentage
+            },
+            assessment_progress: {
+                passed: passedAssessments,
+                total: totalAssessments
+            },
+            course_progress: {
+                completed: combinedCompleted,
+                total: combinedTotal,
+                percentage: combinedPercentage
             }
         });
     } catch (err) {
@@ -367,6 +398,28 @@ router.post('/lessons/:lessonId/toggle-complete', authenticateToken, requireRole
         const completed = compRows[0]?.completed || 0;
         const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
+        // Fetch Assessment Progress
+        const [assessmentsCountRows] = await db.execute(`
+            SELECT COUNT(id) as total_assessments
+            FROM assessments
+            WHERE course_id = ? AND status = 'active'
+        `, [courseId]);
+
+        const [passedAssessmentsRows] = await db.execute(`
+            SELECT COUNT(DISTINCT a.id) as passed_assessments
+            FROM assessments a
+            JOIN assessment_attempts aa ON a.id = aa.assessment_id
+            WHERE a.course_id = ? AND a.status = 'active' 
+              AND aa.student_id = ? AND aa.is_passed = 1
+        `, [courseId, studentId]);
+
+        const totalAssessments = assessmentsCountRows[0].total_assessments || 0;
+        const passedAssessments = passedAssessmentsRows[0].passed_assessments || 0;
+
+        const combinedTotal = total + totalAssessments;
+        const combinedCompleted = completed + passedAssessments;
+        const combinedPercentage = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
+
         res.json({
             completed: isCompleted,
             lesson_id: Number(lessonId),
@@ -374,6 +427,15 @@ router.post('/lessons/:lessonId/toggle-complete', authenticateToken, requireRole
                 completed,
                 total,
                 percentage
+            },
+            assessment_progress: {
+                passed: passedAssessments,
+                total: totalAssessments
+            },
+            course_progress: {
+                completed: combinedCompleted,
+                total: combinedTotal,
+                percentage: combinedPercentage
             }
         });
     } catch (err) {

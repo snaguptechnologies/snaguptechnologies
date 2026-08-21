@@ -131,9 +131,18 @@ router.get('/admin', authenticateToken, requireRole('admin'), async (req, res) =
         if (revenueTrendTrend.length > 60) break; 
     }
 
+    const [totalAssessmentsRows] = await db.execute(`SELECT COUNT(*) as c FROM assessments`);
+    const totalAssessments = totalAssessmentsRows[0].c;
+
+    const [allAttemptsRows] = await db.execute(`SELECT is_passed FROM assessment_attempts`);
+    const totalAttempts = allAttemptsRows.length;
+    const passedAttempts = allAttemptsRows.filter(a => a.is_passed === 1).length;
+    const globalPassRate = totalAttempts > 0 ? Math.round((passedAttempts / totalAttempts) * 100) : 0;
+
     res.json({ 
         totalCourses, totalInstructors, totalStudents, activeBatches, completedBatches, certsIssued, pendingEnrollments, recentBatches, user,
         activeBatchProgress,
+        totalAssessments, globalPassRate,
         financials: { totalRevenue, pendingRevenue, paymentSuccessRate, recentPayments, allPayments, revenueTrend: revenueTrendTrend }
     });
   } catch (err) {
@@ -188,7 +197,28 @@ router.get('/instructor', authenticateToken, requireRole('instructor'), async (r
         try { remindersArray = JSON.parse(remindersRows[0].value); } catch(e){}
     }
 
-    res.json({ myBatches, activeBatches: activeBatchesCount, totalStudents: totalStudentsEnroll, totalBatches: myBatches.length, user, reminders: remindersArray });
+    const [instAssessmentsRows] = await db.execute(`
+      SELECT COUNT(DISTINCT a.id) as c
+      FROM assessments a
+      JOIN batches b ON a.course_id = b.course_id
+      WHERE b.instructor_id = ? AND a.status = 'active'
+    `, [id]);
+    const instructorAssessments = instAssessmentsRows[0].c;
+
+    const [instAttemptsRows] = await db.execute(`
+      SELECT aa.is_passed
+      FROM assessment_attempts aa
+      JOIN batches b ON aa.batch_id = b.id
+      WHERE b.instructor_id = ?
+    `, [id]);
+    const instructorTotalAttempts = instAttemptsRows.length;
+    const instructorPassedAttempts = instAttemptsRows.filter(a => a.is_passed === 1).length;
+    const instructorPassRate = instructorTotalAttempts > 0 ? Math.round((instructorPassedAttempts / instructorTotalAttempts) * 100) : 0;
+
+    res.json({ 
+        myBatches, activeBatches: activeBatchesCount, totalStudents: totalStudentsEnroll, totalBatches: myBatches.length, user, reminders: remindersArray,
+        instructorAssessments, instructorPassRate
+    });
   } catch (err) {
     console.error("Instructor dashboard error:", err);
     res.status(500).json({ error: 'Failed to fetch instructor stats' });

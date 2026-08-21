@@ -509,7 +509,7 @@ export default function CourseWorkspacePage() {
                                                     <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${batch.attendance.eligibleForCertificate ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-muted/80 text-muted-foreground border-border'}`}>
                                                         {batch.attendance.eligibleForCertificate ? 'Eligible' : 'Certification Restricted'}
                                                     </span>
-                                                    <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest">Requirement: 75% Marks</span>
+                                                    <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest">Requirement: 80% Attendance</span>
                                                 </div>
                                             </div>
                                             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -548,7 +548,7 @@ export default function CourseWorkspacePage() {
                                                 <h4 className="text-sm font-black uppercase tracking-tight">Deployment Node</h4>
                                             </div>
                                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                                Your learning progress and attendance are synchronized in real-time. Please maintain a minimum of <span className="text-foreground font-bold">75% attendance</span> to unlock your automated credentials.
+                                                Your learning progress and attendance are synchronized in real-time. Please maintain a minimum of <span className="text-foreground font-bold">80% attendance</span> and <span className="text-foreground font-bold">pass all course assessments</span> to unlock your automated credentials.
                                             </p>
                                             <div className="pt-2 flex items-center gap-4 text-[9px] font-black text-muted-foreground/30 uppercase tracking-[0.3em]">
                                                 <Shield className="w-3.5 h-3.5" />
@@ -785,7 +785,7 @@ export default function CourseWorkspacePage() {
                                 </footer>
                             </section>
                         </div>
-                    ) : (
+                    ) : activeTab === 'syllabus' ? (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Syllabus & Learning Workspace Tab */}
                             
@@ -802,16 +802,23 @@ export default function CourseWorkspacePage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-4 bg-muted/40 px-5 py-3 rounded-2xl border border-border/50 self-stretch sm:self-auto justify-between">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/40 px-5 py-3 rounded-2xl border border-border/50 self-stretch sm:self-auto justify-between">
                                         <div>
-                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Curriculum Progress</p>
-                                            <p className="text-lg font-black font-mono text-primary">
-                                                {studentSyllabus?.lesson_progress?.completed || 0} / {studentSyllabus?.lesson_progress?.total || 0} <span className="text-xs text-muted-foreground font-normal">Lessons</span>
-                                            </p>
+                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">Course Progress</p>
+                                            <div className="flex items-center gap-4 mt-1">
+                                                <p className="text-sm font-black font-mono text-primary">
+                                                    {studentSyllabus?.lesson_progress?.completed || 0} / {studentSyllabus?.lesson_progress?.total || 0} <span className="text-[10px] text-muted-foreground font-normal uppercase">Lessons</span>
+                                                </p>
+                                                {studentSyllabus?.assessment_progress && studentSyllabus.assessment_progress.total > 0 && (
+                                                    <p className="text-sm font-black font-mono text-amber-500 border-l border-border pl-4">
+                                                        {studentSyllabus.assessment_progress.passed} / {studentSyllabus.assessment_progress.total} <span className="text-[10px] text-muted-foreground font-normal uppercase">Assessments</span>
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="text-right pl-4 border-l border-border">
+                                        <div className="text-right sm:pl-4 sm:border-l border-border w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0">
                                             <p className="text-xl font-black font-mono text-primary">
-                                                {studentSyllabus?.lesson_progress?.percentage || 0}%
+                                                {studentSyllabus?.course_progress?.percentage ?? studentSyllabus?.lesson_progress?.percentage ?? 0}%
                                             </p>
                                         </div>
                                     </div>
@@ -822,7 +829,7 @@ export default function CourseWorkspacePage() {
                                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-primary transition-all duration-700 ease-out"
-                                            style={{ width: `${Math.min(studentSyllabus?.lesson_progress?.percentage || 0, 100)}%` }}
+                                            style={{ width: `${Math.min(studentSyllabus?.course_progress?.percentage ?? studentSyllabus?.lesson_progress?.percentage ?? 0, 100)}%` }}
                                         />
                                     </div>
                                 </div>
@@ -1063,9 +1070,410 @@ export default function CourseWorkspacePage() {
                                 </div>
                             )}
                         </div>
+                    ) : (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {/* Assessments Tab */}
+                            <div className="bg-card rounded-3xl border border-border p-6 lg:p-8 space-y-6 shadow-sm bg-gradient-to-br from-card to-muted/20">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                                            <Award className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-black tracking-tight text-foreground uppercase">Course Assessments & Quizzes</h2>
+                                            <p className="text-xs text-muted-foreground font-medium">Verify your knowledge and track evaluation attempts for {assessmentsData?.course_name || batch?.course_name}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={fetchAssessments}
+                                        className="p-2.5 bg-muted/50 hover:bg-muted border border-border rounded-xl text-muted-foreground hover:text-foreground transition-all flex items-center gap-2 text-xs font-bold shrink-0"
+                                        title="Refresh Assessments"
+                                    >
+                                        <RotateCw className={`w-4 h-4 ${assessmentsLoading ? 'animate-spin' : ''}`} />
+                                        Sync Status
+                                    </button>
+                                </div>
+                            </div>
+
+                            {assessmentsLoading ? (
+                                <div className="py-20 text-center bg-card rounded-3xl border border-border flex flex-col items-center justify-center gap-4">
+                                    <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Synchronizing Assessment Matrix...</p>
+                                </div>
+                            ) : assessmentsError ? (
+                                <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-500 text-xs font-bold flex items-center gap-3">
+                                    <AlertCircle className="w-5 h-5 shrink-0" />
+                                    <span>{assessmentsError}</span>
+                                </div>
+                            ) : !assessmentsData?.assessments || assessmentsData.assessments.length === 0 ? (
+                                <div className="py-24 text-center bg-card rounded-3xl border border-border flex flex-col items-center justify-center gap-4 p-8">
+                                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                        <Award className="w-8 h-8 text-muted-foreground/40" />
+                                    </div>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">No Assessments Assigned Yet</h3>
+                                    <p className="text-xs text-muted-foreground max-w-sm">Quizzes and evaluation tests will appear here as soon as published by the course coordinator.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {assessmentsData.assessments.map((ass: any) => {
+                                        const isPassed = ass.is_passed;
+                                        const hasInProgress = ass.has_in_progress;
+                                        const isExhausted = ass.max_attempts > 0 && ass.remaining_attempts === 0 && !hasInProgress;
+
+                                        return (
+                                            <div key={ass.id} className="bg-card rounded-3xl border border-border/80 p-6 lg:p-8 space-y-6 flex flex-col justify-between hover:border-amber-500/30 transition-all shadow-sm">
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        {ass.module_title ? (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">
+                                                                {ass.module_title}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-primary px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20">
+                                                                Course Assessment
+                                                            </span>
+                                                        )}
+
+                                                        {isPassed ? (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1">
+                                                                <CheckCircle2 className="w-3 h-3" /> Passed
+                                                            </span>
+                                                        ) : hasInProgress ? (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-sky-500 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/20 animate-pulse">
+                                                                ● In Progress
+                                                            </span>
+                                                        ) : isExhausted ? (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 px-2.5 py-1 rounded-md bg-rose-500/10 border border-rose-500/20">
+                                                                Attempts Limit
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground px-2.5 py-1 rounded-md bg-muted border border-border">
+                                                                Available
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-foreground leading-snug">{ass.title}</h3>
+                                                        {ass.description && (
+                                                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ass.description}</p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Specs Grid */}
+                                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                                        <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-0.5">
+                                                            <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Questions</p>
+                                                            <p className="text-xs font-black text-foreground">{ass.question_count} Questions</p>
+                                                        </div>
+                                                        <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-0.5">
+                                                            <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Pass Threshold</p>
+                                                            <p className="text-xs font-black text-amber-500">{ass.pass_percentage}% Marks</p>
+                                                        </div>
+                                                        <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-0.5">
+                                                            <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Time Limit</p>
+                                                            <p className="text-xs font-black text-foreground">{ass.time_limit_mins > 0 ? `${ass.time_limit_mins} Mins` : 'No Limit'}</p>
+                                                        </div>
+                                                        <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-0.5">
+                                                            <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Attempts Used</p>
+                                                            <p className="text-xs font-black text-foreground">{ass.attempt_count} / {ass.max_attempts > 0 ? ass.max_attempts : '∞'}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {ass.attempt_count > 0 && (
+                                                        <div className="flex items-center justify-between p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10 text-xs">
+                                                            <span className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider">Best Percentage</span>
+                                                            <span className="font-black text-emerald-600 font-mono text-sm">{ass.best_percentage}%</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="pt-4 border-t border-border/50 flex flex-col sm:flex-row gap-3">
+                                                    {hasInProgress ? (
+                                                        <button
+                                                            onClick={() => handleStartTest(ass.id)}
+                                                            disabled={startingTestId === ass.id}
+                                                            className="w-full py-3.5 bg-sky-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-sky-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"
+                                                        >
+                                                            {startingTestId === ass.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                                                            Resume Assessment
+                                                        </button>
+                                                    ) : isExhausted ? (
+                                                        <button
+                                                            disabled
+                                                            className="w-full py-3.5 bg-muted text-muted-foreground rounded-xl text-xs font-black uppercase tracking-widest border border-border opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
+                                                        >
+                                                            <Lock className="w-4 h-4" /> Max Attempts Reached
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleStartTest(ass.id)}
+                                                            disabled={startingTestId === ass.id || ass.question_count === 0}
+                                                            className="w-full py-3.5 bg-amber-500 text-amber-950 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                                                        >
+                                                            {startingTestId === ass.id ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : ass.attempt_count > 0 ? (
+                                                                <>
+                                                                    <RotateCw className="w-4 h-4" /> Re-attempt Assessment
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <PlayCircle className="w-4 h-4" /> Start Assessment
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )}
+
+                                                    {ass.attempts && ass.attempts.length > 0 && (
+                                                        <button
+                                                            onClick={() => handleViewResult(ass.id, ass.attempts[0].attempt_id)}
+                                                            className="py-3.5 px-4 bg-muted/50 hover:bg-muted text-foreground border border-border rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                                                            title="View Latest Result"
+                                                        >
+                                                            <Award className="w-4 h-4 text-amber-500" /> Result
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </main>
+
+            {/* Active Test Execution Player Modal (Fullscreen Overlay) */}
+            {activeTest && (
+                <div className="fixed inset-0 z-[100] bg-background flex flex-col animate-in fade-in duration-300">
+                    {/* Test Player Header */}
+                    <header className="h-20 px-6 lg:px-12 border-b border-border bg-card flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center">
+                                <Award className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-foreground tracking-tight uppercase truncate max-w-md">{activeTest.assessment_title}</h2>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    Attempt #{activeTest.attempt_number} · Pass Threshold: {activeTest.pass_percentage}%
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            {/* Countdown Timer Badge */}
+                            {timeLeftSeconds !== null && (
+                                <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 font-mono text-sm font-black ${
+                                    timeLeftSeconds < 60
+                                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 animate-pulse'
+                                        : 'bg-muted/50 border-border text-amber-500'
+                                }`}>
+                                    <Clock className="w-4 h-4" />
+                                    <span>
+                                        {String(Math.floor(timeLeftSeconds / 60)).padStart(2, '0')}:
+                                        {String(timeLeftSeconds % 60).padStart(2, '0')}
+                                    </span>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    if (confirm("Are you sure you want to pause/exit this attempt? You can resume it anytime before the time limit expires.")) {
+                                        setActiveTest(null);
+                                        setTimeLeftSeconds(null);
+                                        fetchAssessments();
+                                    }
+                                }}
+                                className="px-4 py-2 bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground text-xs font-bold uppercase tracking-widest rounded-xl transition-colors border border-border"
+                            >
+                                Pause & Exit
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Test Player Body */}
+                    <div className="flex-1 overflow-y-auto p-6 lg:p-12 custom-scrollbar flex items-center justify-center">
+                        <div className="max-w-3xl w-full space-y-8">
+                            
+                            {/* Stepper Progress */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                    <span>Question {currentQuestionIndex + 1} of {activeTest.questions?.length || 0}</span>
+                                    <span>{Math.round(((currentQuestionIndex + 1) / (activeTest.questions?.length || 1)) * 100)}% Completed</span>
+                                </div>
+                                <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden border border-border/30">
+                                    <div
+                                        className="h-full bg-amber-500 transition-all duration-500"
+                                        style={{ width: `${((currentQuestionIndex + 1) / (activeTest.questions?.length || 1)) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            {testError && (
+                                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-500 text-xs font-bold flex items-center gap-3">
+                                    <AlertCircle className="w-5 h-5 shrink-0" />
+                                    <span>{testError}</span>
+                                </div>
+                            )}
+
+                            {/* Question Card */}
+                            {activeTest.questions && activeTest.questions.length > currentQuestionIndex && (
+                                <div className="bg-card rounded-3xl border border-border p-8 lg:p-10 space-y-8 shadow-xl">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 px-2.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                                                {activeTest.questions[currentQuestionIndex].points} {activeTest.questions[currentQuestionIndex].points === 1 ? 'Point' : 'Points'}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                                                {activeTest.questions[currentQuestionIndex].question_type === 'tf' ? 'True / False' : 'Multiple Choice'}
+                                            </span>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-foreground leading-relaxed">
+                                            {activeTest.questions[currentQuestionIndex].question_text}
+                                        </h3>
+                                    </div>
+
+                                    {/* Options List */}
+                                    <div className="space-y-3">
+                                        {activeTest.questions[currentQuestionIndex].options?.map((opt: string, optIdx: number) => {
+                                            const qId = activeTest.questions[currentQuestionIndex].id;
+                                            const isSelected = selectedAnswers[qId] === optIdx;
+
+                                            return (
+                                                <button
+                                                    key={optIdx}
+                                                    onClick={() => {
+                                                        setSelectedAnswers(prev => ({ ...prev, [qId]: optIdx }));
+                                                    }}
+                                                    className={`w-full p-5 rounded-2xl text-left border text-sm font-bold transition-all flex items-center justify-between ${
+                                                        isSelected
+                                                            ? "bg-amber-500/10 text-amber-500 border-amber-500 shadow-md shadow-amber-500/5 scale-[1.01]"
+                                                            : "bg-muted/30 border-border text-foreground hover:bg-muted/70"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-black ${
+                                                            isSelected ? 'border-amber-500 bg-amber-500 text-amber-950' : 'border-border text-muted-foreground'
+                                                        }`}>
+                                                            {String.fromCharCode(65 + optIdx)}
+                                                        </div>
+                                                        <span>{opt}</span>
+                                                    </div>
+                                                    {isSelected && <CheckCircle2 className="w-5 h-5 text-amber-500 shrink-0" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bottom Controls */}
+                            <div className="flex items-center justify-between gap-4 pt-4">
+                                <button
+                                    onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                                    disabled={currentQuestionIndex === 0}
+                                    className="px-6 py-3.5 bg-muted hover:bg-muted/80 text-foreground rounded-xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 transition-all border border-border"
+                                >
+                                    Previous
+                                </button>
+
+                                <div className="flex items-center gap-2">
+                                    {activeTest.questions?.map((_: any, idx: number) => {
+                                        const qId = activeTest.questions[idx]?.id;
+                                        const isAnswered = selectedAnswers[qId] !== undefined;
+                                        const isCurrent = currentQuestionIndex === idx;
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => setCurrentQuestionIndex(idx)}
+                                                className={`w-3 h-3 rounded-full transition-all ${
+                                                    isCurrent ? 'bg-amber-500 scale-125' :
+                                                    isAnswered ? 'bg-emerald-500/80' : 'bg-muted-foreground/30'
+                                                }`}
+                                                title={`Question ${idx + 1}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
+                                {currentQuestionIndex < (activeTest.questions?.length || 0) - 1 ? (
+                                    <button
+                                        onClick={() => setCurrentQuestionIndex(prev => Math.min((activeTest.questions?.length || 1) - 1, prev + 1))}
+                                        className="px-6 py-3.5 bg-foreground text-background hover:opacity-90 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                                    >
+                                        Next Question
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleSubmitTest}
+                                        disabled={submittingTest}
+                                        className="px-8 py-3.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-xl shadow-amber-500/20 flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {submittingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                                        Submit Assessment
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Score & Result Modal Overlay */}
+            {showResultModal && lastResult && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-card border border-border rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-center">
+                            {lastResult.is_passed ? (
+                                <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 animate-bounce">
+                                    <Award className="w-10 h-10" />
+                                </div>
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500">
+                                    <XCircle className="w-10 h-10" />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                                lastResult.is_passed
+                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                    : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                            }`}>
+                                {lastResult.is_passed ? '🎉 Assessment Passed' : 'Needs Review'}
+                            </span>
+                            <h3 className="text-2xl font-black text-foreground tracking-tight">{lastResult.assessment_title || 'Assessment Result'}</h3>
+                        </div>
+
+                        <div className="p-6 bg-muted/40 rounded-2xl border border-border/50 space-y-3">
+                            <div className="text-4xl font-black font-mono tracking-tight text-foreground">
+                                {lastResult.percentage}%
+                            </div>
+                            <p className="text-xs font-bold text-muted-foreground">
+                                Score: <span className="text-foreground font-black">{lastResult.score_obtained}</span> / {lastResult.total_points} Points
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 font-semibold uppercase tracking-widest">
+                                Required Threshold: {lastResult.pass_percentage}%
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setShowResultModal(false);
+                                setLastResult(null);
+                            }}
+                            className="w-full py-4 bg-primary text-primary-foreground font-black text-xs uppercase tracking-widest rounded-xl hover:opacity-90 transition-opacity"
+                        >
+                            Return to Workspace Assessments
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

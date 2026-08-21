@@ -3,6 +3,19 @@ const router = express.Router();
 const db = require('../db/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
+// Helper to check if instructor teaches any batch for a given course
+async function verifyInstructorCourseAccess(instructorId, courseId) {
+    const [rows] = await db.execute(`SELECT id FROM batches WHERE instructor_id = ? AND course_id = ? LIMIT 1`, [instructorId, courseId]);
+    return rows.length > 0;
+}
+
+// Helper to check if instructor teaches any batch for the course associated with an assessment
+async function verifyInstructorAssessmentAccess(instructorId, assessmentId) {
+    const [assRows] = await db.execute(`SELECT course_id FROM assessments WHERE id = ?`, [assessmentId]);
+    if (assRows.length === 0) return false;
+    return await verifyInstructorCourseAccess(instructorId, assRows[0].course_id);
+}
+
 // ==========================================
 // STUDENT ENDPOINTS
 // ==========================================
@@ -382,9 +395,13 @@ router.get('/:id/result/:attemptId', authenticateToken, requireRole('student'), 
 
 // GET /api/assessments/course/:courseId
 // Admin fetch all assessments for a course with module details and question count
-router.get('/course/:courseId', authenticateToken, requireRole('admin'), async (req, res) => {
+router.get('/course/:courseId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { courseId } = req.params;
     try {
+        if (req.user.role === 'instructor') {
+            const hasAccess = await verifyInstructorCourseAccess(req.user.id, courseId);
+            if (!hasAccess) return res.status(403).json({ error: 'Access denied. You are not assigned to this course.' });
+        }
         const [courseRows] = await db.execute(`SELECT id, name FROM courses WHERE id = ?`, [courseId]);
         if (courseRows.length === 0) {
             return res.status(404).json({ error: 'Course not found.' });
@@ -426,11 +443,16 @@ router.get('/course/:courseId', authenticateToken, requireRole('admin'), async (
 
 // POST /api/assessments
 // Admin create new assessment
-router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { course_id, module_id, title, description, pass_percentage = 70, time_limit_mins = 0, max_attempts = 3, status = 'active' } = req.body;
 
     if (!course_id || !title || !title.trim()) {
         return res.status(400).json({ error: 'Course ID and Assessment Title are required.' });
+    }
+
+    if (req.user.role === 'instructor') {
+        const hasAccess = await verifyInstructorCourseAccess(req.user.id, course_id);
+        if (!hasAccess) return res.status(403).json({ error: 'Access denied. You are not assigned to this course.' });
     }
 
     const passPct = parseInt(pass_percentage);
@@ -481,8 +503,12 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
 
 // PUT /api/assessments/:id
 // Admin update assessment details
-router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const assessmentId = req.params.id;
+    if (req.user.role === 'instructor') {
+        const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, assessmentId);
+        if (!hasAccess) return res.status(403).json({ error: 'Access denied. You are not assigned to this course.' });
+    }
     const { title, description, pass_percentage, time_limit_mins, max_attempts, status } = req.body;
 
     if (!title || !title.trim()) {
@@ -528,8 +554,12 @@ router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => 
 
 // DELETE /api/assessments/:id
 // Admin delete assessment
-router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const assessmentId = req.params.id;
+    if (req.user.role === 'instructor') {
+        const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, assessmentId);
+        if (!hasAccess) return res.status(403).json({ error: 'Access denied. You are not assigned to this course.' });
+    }
     try {
         const [existing] = await db.execute(`SELECT id FROM assessments WHERE id = ?`, [assessmentId]);
         if (existing.length === 0) {
@@ -546,8 +576,12 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
 
 // POST /api/assessments/:id/questions
 // Admin add question to assessment
-router.post('/:id/questions', authenticateToken, requireRole('admin'), async (req, res) => {
+router.post('/:id/questions', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const assessmentId = req.params.id;
+    if (req.user.role === 'instructor') {
+        const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, assessmentId);
+        if (!hasAccess) return res.status(403).json({ error: 'Access denied. You are not assigned to this course.' });
+    }
     const { question_text, question_type = 'mcq', options_json, correct_option_index, points = 1, sequence_order = 1 } = req.body;
 
     if (!question_text || !question_text.trim()) {
@@ -604,8 +638,15 @@ router.post('/:id/questions', authenticateToken, requireRole('admin'), async (re
 
 // PUT /api/questions/:id
 // Admin update question
-router.put('/questions/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/questions/:id', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const questionId = req.params.id;
+    if (req.user.role === 'instructor') {
+        const [qRows] = await db.execute('SELECT assessment_id FROM assessment_questions WHERE id = ?', [questionId]);
+        if (qRows.length > 0) {
+            const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, qRows[0].assessment_id);
+            if (!hasAccess) return res.status(403).json({ error: 'Access denied.' });
+        }
+    }
     const { question_text, question_type = 'mcq', options_json, correct_option_index, points = 1, sequence_order = 1 } = req.body;
 
     if (!question_text || !question_text.trim()) {
@@ -663,8 +704,15 @@ router.put('/questions/:id', authenticateToken, requireRole('admin'), async (req
 
 // DELETE /api/questions/:id
 // Admin delete question
-router.delete('/questions/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.delete('/questions/:id', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const questionId = req.params.id;
+    if (req.user.role === 'instructor') {
+        const [qRows] = await db.execute('SELECT assessment_id FROM assessment_questions WHERE id = ?', [questionId]);
+        if (qRows.length > 0) {
+            const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, qRows[0].assessment_id);
+            if (!hasAccess) return res.status(403).json({ error: 'Access denied.' });
+        }
+    }
     try {
         const [existing] = await db.execute(`SELECT id FROM assessment_questions WHERE id = ?`, [questionId]);
         if (existing.length === 0) {
@@ -681,12 +729,24 @@ router.delete('/questions/:id', authenticateToken, requireRole('admin'), async (
 
 // GET /api/assessments/:id/results
 // Admin fetch student attempt logs for an assessment
-router.get('/:id/results', authenticateToken, requireRole('admin'), async (req, res) => {
+router.get('/:id/results', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const assessmentId = req.params.id;
     try {
+        if (req.user.role === 'instructor') {
+            const hasAccess = await verifyInstructorAssessmentAccess(req.user.id, assessmentId);
+            if (!hasAccess) return res.status(403).json({ error: 'Access denied.' });
+        }
+
         const [assRows] = await db.execute(`SELECT id, title FROM assessments WHERE id = ?`, [assessmentId]);
         if (assRows.length === 0) {
             return res.status(404).json({ error: 'Assessment not found.' });
+        }
+
+        let queryParams = [assessmentId];
+        let filterStr = "";
+        if (req.user.role === 'instructor') {
+            filterStr = " AND b.instructor_id = ? ";
+            queryParams.push(req.user.id);
         }
 
         const [attempts] = await db.execute(`
@@ -696,9 +756,9 @@ router.get('/:id/results', authenticateToken, requireRole('admin'), async (req, 
             FROM assessment_attempts a
             JOIN users u ON a.student_id = u.id
             JOIN batches b ON a.batch_id = b.id
-            WHERE a.assessment_id = ?
+            WHERE a.assessment_id = ? ${filterStr}
             ORDER BY a.started_at DESC
-        `, [assessmentId]);
+        `, queryParams);
 
         res.json({
             assessment: assRows[0],

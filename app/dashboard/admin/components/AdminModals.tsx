@@ -4,7 +4,7 @@ import React from 'react';
 import { 
     X, CheckCircle, Loader2, Users, BookOpen, Clock, 
     Layers, Search, AlertCircle, XCircle, User, 
-    Award, GraduationCap, Eye, EyeOff, FileText, Calendar, Trash2 
+    Award, GraduationCap, Eye, EyeOff, FileText, Calendar, Trash2, Edit2
 } from 'lucide-react';
 
 interface AdminModalsProps {
@@ -55,6 +55,39 @@ interface AdminModalsProps {
     handleConfirmDeleteModule?: (moduleId: number) => void;
     handleCreateLessonSubmit?: (e: React.FormEvent) => void;
     handleEditLessonSubmit?: (e: React.FormEvent) => void;
+
+    // Assessment Modals
+    showCreateAssessmentModal?: boolean;
+    setShowCreateAssessmentModal?: (show: boolean) => void;
+    showEditAssessmentModal?: boolean;
+    setShowEditAssessmentModal?: (show: boolean) => void;
+    assessmentForm?: any;
+    setAssessmentForm?: (form: any) => void;
+    editAssessmentForm?: any;
+    setEditAssessmentForm?: (form: any) => void;
+    handleCreateAssessmentSubmit?: (e: React.FormEvent) => void;
+    handleEditAssessmentSubmit?: (e: React.FormEvent) => void;
+
+    showQuestionManagerModal?: boolean;
+    setShowQuestionManagerModal?: (show: boolean) => void;
+    selectedAssessmentForQuestions?: any;
+    questionsData?: any[];
+    showQuestionModal?: boolean;
+    setShowQuestionModal?: (show: boolean) => void;
+    editingQuestion?: any;
+    questionForm?: any;
+    setQuestionForm?: (form: any) => void;
+    openCreateQuestionModal?: () => void;
+    openEditQuestionModal?: (q: any) => void;
+    handleSaveQuestionSubmit?: (e: React.FormEvent) => void;
+    handleDeleteQuestion?: (questionId: number) => void;
+
+    showAssessmentResultsModal?: boolean;
+    setShowAssessmentResultsModal?: (show: boolean) => void;
+    selectedAssessmentForResults?: any;
+    assessmentResultsData?: any[];
+    resultsLoading?: boolean;
+    syllabusData?: any;
 
     // Forms
     courseForm: any;
@@ -129,6 +162,20 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
         editLessonForm, setEditLessonForm,
         handleCreateModuleSubmit, handleEditModuleSubmit,
         handleConfirmDeleteModule, handleCreateLessonSubmit, handleEditLessonSubmit,
+        showCreateAssessmentModal, setShowCreateAssessmentModal,
+        showEditAssessmentModal, setShowEditAssessmentModal,
+        assessmentForm, setAssessmentForm,
+        editAssessmentForm, setEditAssessmentForm,
+        handleCreateAssessmentSubmit, handleEditAssessmentSubmit,
+        showQuestionManagerModal, setShowQuestionManagerModal,
+        selectedAssessmentForQuestions, questionsData,
+        showQuestionModal, setShowQuestionModal,
+        editingQuestion, questionForm, setQuestionForm,
+        openCreateQuestionModal, openEditQuestionModal,
+        handleSaveQuestionSubmit, handleDeleteQuestion,
+        showAssessmentResultsModal, setShowAssessmentResultsModal,
+        selectedAssessmentForResults, assessmentResultsData, resultsLoading,
+        syllabusData,
         courseForm, setCourseForm,
         instForm, setInstForm,
         batchForm, setBatchForm,
@@ -1057,6 +1104,548 @@ const AdminModals: React.FC<AdminModalsProps> = (props) => {
                             >
                                 {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> Delete Module</>}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE / EDIT ASSESSMENT MODAL */}
+            {(showCreateAssessmentModal || showEditAssessmentModal) && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-xl p-4 animate-fade-in" onClick={() => {
+                    setShowCreateAssessmentModal && setShowCreateAssessmentModal(false);
+                    setShowEditAssessmentModal && setShowEditAssessmentModal(false);
+                }}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-amber-500/20 bg-card flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="mb-6 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                                    <Award className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">
+                                        {showEditAssessmentModal ? "Edit Assessment" : "Create New Assessment"}
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                        Academic Evaluation Configuration
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => {
+                                setShowCreateAssessmentModal && setShowCreateAssessmentModal(false);
+                                setShowEditAssessmentModal && setShowEditAssessmentModal(false);
+                            }} className="p-2 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={showEditAssessmentModal ? handleEditAssessmentSubmit : handleCreateAssessmentSubmit} className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Assessment Title *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={showEditAssessmentModal ? editAssessmentForm?.title : assessmentForm?.title}
+                                    onChange={e => {
+                                        if (showEditAssessmentModal && setEditAssessmentForm) {
+                                            setEditAssessmentForm({ ...editAssessmentForm, title: e.target.value });
+                                        } else if (setAssessmentForm) {
+                                            setAssessmentForm({ ...assessmentForm, title: e.target.value });
+                                        }
+                                    }}
+                                    placeholder="e.g. Module 1 Knowledge Check / Course Final Exam"
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Description (Optional)</label>
+                                <textarea
+                                    rows={2}
+                                    value={showEditAssessmentModal ? editAssessmentForm?.description : assessmentForm?.description}
+                                    onChange={e => {
+                                        if (showEditAssessmentModal && setEditAssessmentForm) {
+                                            setEditAssessmentForm({ ...editAssessmentForm, description: e.target.value });
+                                        } else if (setAssessmentForm) {
+                                            setAssessmentForm({ ...assessmentForm, description: e.target.value });
+                                        }
+                                    }}
+                                    placeholder="Instructions for students taking this evaluation..."
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Parent Module (Optional)</label>
+                                <select
+                                    value={showEditAssessmentModal ? editAssessmentForm?.module_id : assessmentForm?.module_id}
+                                    onChange={e => {
+                                        if (showEditAssessmentModal && setEditAssessmentForm) {
+                                            setEditAssessmentForm({ ...editAssessmentForm, module_id: e.target.value });
+                                        } else if (setAssessmentForm) {
+                                            setAssessmentForm({ ...assessmentForm, module_id: e.target.value });
+                                        }
+                                    }}
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                >
+                                    <option value="">Course Level (Final Assessment)</option>
+                                    {syllabusData?.modules?.map((m: any) => (
+                                        <option key={m.id} value={m.id}>Module #{m.sequence_order}: {m.title}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Pass Percentage (%)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={showEditAssessmentModal ? editAssessmentForm?.pass_percentage : assessmentForm?.pass_percentage}
+                                        onChange={e => {
+                                            if (showEditAssessmentModal && setEditAssessmentForm) {
+                                                setEditAssessmentForm({ ...editAssessmentForm, pass_percentage: e.target.value });
+                                            } else if (setAssessmentForm) {
+                                                setAssessmentForm({ ...assessmentForm, pass_percentage: e.target.value });
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Time Limit (Minutes)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={showEditAssessmentModal ? editAssessmentForm?.time_limit_mins : assessmentForm?.time_limit_mins}
+                                        onChange={e => {
+                                            if (showEditAssessmentModal && setEditAssessmentForm) {
+                                                setEditAssessmentForm({ ...editAssessmentForm, time_limit_mins: e.target.value });
+                                            } else if (setAssessmentForm) {
+                                                setAssessmentForm({ ...assessmentForm, time_limit_mins: e.target.value });
+                                            }
+                                        }}
+                                        placeholder="0 = No limit"
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Maximum Attempts</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={showEditAssessmentModal ? editAssessmentForm?.max_attempts : assessmentForm?.max_attempts}
+                                        onChange={e => {
+                                            if (showEditAssessmentModal && setEditAssessmentForm) {
+                                                setEditAssessmentForm({ ...editAssessmentForm, max_attempts: e.target.value });
+                                            } else if (setAssessmentForm) {
+                                                setAssessmentForm({ ...assessmentForm, max_attempts: e.target.value });
+                                            }
+                                        }}
+                                        placeholder="0 = Unlimited"
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Status</label>
+                                    <select
+                                        value={showEditAssessmentModal ? editAssessmentForm?.status : assessmentForm?.status}
+                                        onChange={e => {
+                                            if (showEditAssessmentModal && setEditAssessmentForm) {
+                                                setEditAssessmentForm({ ...editAssessmentForm, status: e.target.value });
+                                            } else if (setAssessmentForm) {
+                                                setAssessmentForm({ ...assessmentForm, status: e.target.value });
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    >
+                                        <option value="active">Active (Visible to Enrolled Students)</option>
+                                        <option value="inactive">Inactive (Hidden)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex items-center justify-end gap-3 border-t border-border/30">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCreateAssessmentModal && setShowCreateAssessmentModal(false);
+                                        setShowEditAssessmentModal && setShowEditAssessmentModal(false);
+                                    }}
+                                    className="px-6 py-3 bg-muted hover:bg-muted/80 text-foreground font-black text-xs rounded-xl uppercase tracking-wider"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={formLoading}
+                                    className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl uppercase tracking-wider shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                                >
+                                    {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                                    {showEditAssessmentModal ? "Update Assessment" : "Create Assessment"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* QUESTION MANAGER MODAL */}
+            {showQuestionManagerModal && selectedAssessmentForQuestions && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowQuestionManagerModal && setShowQuestionManagerModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-4xl relative shadow-2xl border-amber-500/20 bg-card flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="mb-6 flex items-center justify-between border-b border-border/20 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                                    <Award className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">Question Manager</h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                        Assessment: {selectedAssessmentForQuestions.title} ({questionsData?.length || 0} Questions)
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => openCreateQuestionModal && openCreateQuestionModal()}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                                >
+                                    + Add Question
+                                </button>
+                                <button onClick={() => setShowQuestionManagerModal && setShowQuestionManagerModal(false)} className="p-2 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Questions List */}
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                            {!questionsData || questionsData.length === 0 ? (
+                                <div className="py-20 text-center bg-muted/10 rounded-2xl border border-dashed border-border p-6 space-y-3">
+                                    <Award className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No questions created for this assessment yet.</p>
+                                    <button
+                                        onClick={() => openCreateQuestionModal && openCreateQuestionModal()}
+                                        className="px-4 py-2 bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 rounded-xl text-xs font-bold inline-flex items-center gap-2"
+                                    >
+                                        + Add First Question
+                                    </button>
+                                </div>
+                            ) : (
+                                questionsData.map((q: any, idx: number) => {
+                                    const optionsList = Array.isArray(q.options) ? q.options : [];
+                                    const correctIdx = Number(q.correct_option_index);
+
+                                    return (
+                                        <div key={q.id || idx} className="p-5 bg-muted/20 border border-border/40 rounded-2xl space-y-3 relative group">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center font-mono font-black text-xs shrink-0">
+                                                        Q{idx + 1}
+                                                    </span>
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                                                                {q.question_type === 'tf' ? 'True / False' : 'MCQ'}
+                                                            </span>
+                                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/10 text-amber-500">
+                                                                {q.points} {q.points === 1 ? 'Pt' : 'Pts'}
+                                                            </span>
+                                                        </div>
+                                                        <h4 className="text-sm font-bold text-foreground leading-relaxed">{q.question_text}</h4>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button
+                                                        onClick={() => openEditQuestionModal && openEditQuestionModal(q)}
+                                                        className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-all"
+                                                        title="Edit Question"
+                                                    >
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteQuestion && handleDeleteQuestion(q.id)}
+                                                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all"
+                                                        title="Delete Question"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Options Grid with Admin Correct Answer Highlight */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                                                {optionsList.map((opt: string, optIdx: number) => {
+                                                    const isCorrect = optIdx === correctIdx;
+
+                                                    return (
+                                                        <div
+                                                            key={optIdx}
+                                                            className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between ${
+                                                                isCorrect
+                                                                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                                                                    : "bg-background/40 border-border/30 text-muted-foreground"
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2 truncate">
+                                                                <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-black text-foreground">
+                                                                    {String.fromCharCode(65 + optIdx)}
+                                                                </span>
+                                                                <span className="truncate">{opt}</span>
+                                                            </div>
+                                                            {isCorrect && (
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-1 shrink-0">
+                                                                    <CheckCircle className="w-3.5 h-3.5" /> Correct Key
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD / EDIT QUESTION SUB-MODAL */}
+            {showQuestionModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-background/80 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowQuestionModal && setShowQuestionModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-lg relative shadow-2xl border-amber-500/20 bg-card flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="mb-6 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                                    <Award className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">
+                                        {editingQuestion ? "Edit Question" : "Add Question"}
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                        Configure Question & Correct Key
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowQuestionModal && setShowQuestionModal(false)} className="p-2 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveQuestionSubmit} className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Question Text *</label>
+                                <textarea
+                                    rows={3}
+                                    required
+                                    value={questionForm?.question_text || ''}
+                                    onChange={e => setQuestionForm && setQuestionForm({ ...questionForm, question_text: e.target.value })}
+                                    placeholder="Enter question statement..."
+                                    className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Question Type</label>
+                                    <select
+                                        value={questionForm?.question_type || 'mcq'}
+                                        onChange={e => {
+                                            const newType = e.target.value;
+                                            if (setQuestionForm) {
+                                                setQuestionForm({
+                                                    ...questionForm,
+                                                    question_type: newType,
+                                                    options: newType === 'tf' ? ["True", "False"] : (questionForm?.options || ["", "", "", ""]),
+                                                    correct_option_index: 0
+                                                });
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    >
+                                        <option value="mcq">Multiple Choice (MCQ)</option>
+                                        <option value="tf">True / False</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-1.5">Points / Marks</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={questionForm?.points || 1}
+                                        onChange={e => setQuestionForm && setQuestionForm({ ...questionForm, points: e.target.value })}
+                                        className="w-full px-4 py-3 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Options Input */}
+                            <div className="space-y-3 pt-2">
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">
+                                    Answer Options & Select Correct Key *
+                                </label>
+
+                                {questionForm?.question_type === 'tf' ? (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {["True", "False"].map((opt, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => setQuestionForm && setQuestionForm({ ...questionForm, correct_option_index: idx })}
+                                                className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between ${
+                                                    Number(questionForm?.correct_option_index) === idx
+                                                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                                                        : "bg-muted/30 border-border text-foreground"
+                                                }`}
+                                            >
+                                                <span>{opt}</span>
+                                                {Number(questionForm?.correct_option_index) === idx && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {questionForm?.options?.map((opt: string, idx: number) => (
+                                            <div key={idx} className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setQuestionForm && setQuestionForm({ ...questionForm, correct_option_index: idx })}
+                                                    className={`w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-black shrink-0 transition-all ${
+                                                        Number(questionForm?.correct_option_index) === idx
+                                                            ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20"
+                                                            : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                                                    }`}
+                                                    title="Mark as correct answer key"
+                                                >
+                                                    {String.fromCharCode(65 + idx)}
+                                                </button>
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    value={opt}
+                                                    onChange={e => {
+                                                        const newOpts = [...(questionForm?.options || [])];
+                                                        newOpts[idx] = e.target.value;
+                                                        if (setQuestionForm) {
+                                                            setQuestionForm({ ...questionForm, options: newOpts });
+                                                        }
+                                                    }}
+                                                    placeholder={`Option ${String.fromCharCode(65 + idx)} text...`}
+                                                    className="flex-1 px-4 py-2.5 bg-muted/30 border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none focus:border-amber-500"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-4 flex items-center justify-end gap-3 border-t border-border/30">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowQuestionModal && setShowQuestionModal(false)}
+                                    className="px-6 py-3 bg-muted hover:bg-muted/80 text-foreground font-black text-xs rounded-xl uppercase tracking-wider"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={formLoading}
+                                    className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs rounded-xl uppercase tracking-wider shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                                >
+                                    {formLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                                    Save Question
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* STUDENT ASSESSMENT RESULTS MODAL */}
+            {showAssessmentResultsModal && selectedAssessmentForResults && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-xl p-4 animate-fade-in" onClick={() => setShowAssessmentResultsModal && setShowAssessmentResultsModal(false)}>
+                    <div className="admin-card p-6 md:p-8 w-full max-w-4xl relative shadow-2xl border-primary/20 bg-card flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="mb-6 flex items-center justify-between border-b border-border/20 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                                    <Award className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight">Student Attempt Logs</h3>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                        Assessment: {selectedAssessmentForResults.title} ({assessmentResultsData?.length || 0} Submissions)
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowAssessmentResultsModal && setShowAssessmentResultsModal(false)} className="p-2 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Table */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            {resultsLoading ? (
+                                <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
+                                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Fetching Student Submission Logs...</p>
+                                </div>
+                            ) : !assessmentResultsData || assessmentResultsData.length === 0 ? (
+                                <div className="py-20 text-center bg-muted/10 rounded-2xl border border-dashed border-border p-6 space-y-2">
+                                    <Award className="w-10 h-10 text-muted-foreground/30 mx-auto" />
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No student attempts recorded for this assessment yet.</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-border/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground bg-muted/20">
+                                                <th className="p-3.5">Student Details</th>
+                                                <th className="p-3.5">Batch</th>
+                                                <th className="p-3.5">Attempt #</th>
+                                                <th className="p-3.5">Score / Total</th>
+                                                <th className="p-3.5">Percentage</th>
+                                                <th className="p-3.5">Status</th>
+                                                <th className="p-3.5">Submitted At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/20 text-xs font-bold">
+                                            {assessmentResultsData.map((att: any) => (
+                                                <tr key={att.attempt_id} className="hover:bg-muted/30 transition-colors">
+                                                    <td className="p-3.5">
+                                                        <div className="font-bold text-foreground">{att.student_name}</div>
+                                                        <div className="text-[10px] text-muted-foreground font-mono">{att.student_email}</div>
+                                                    </td>
+                                                    <td className="p-3.5 text-muted-foreground">{att.batch_name}</td>
+                                                    <td className="p-3.5 font-mono">Attempt #{att.attempt_number}</td>
+                                                    <td className="p-3.5 font-mono">{att.score_obtained} / {att.total_points}</td>
+                                                    <td className="p-3.5 font-mono font-black text-primary">{att.percentage}%</td>
+                                                    <td className="p-3.5">
+                                                        {att.is_passed ? (
+                                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase">
+                                                                Passed
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase">
+                                                                Failed
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3.5 text-muted-foreground text-[11px] font-mono">
+                                                        {att.submitted_at ? new Date(att.submitted_at).toLocaleString() : 'In Progress'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
