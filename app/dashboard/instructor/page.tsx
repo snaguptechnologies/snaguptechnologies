@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 import { useAuthGuard } from "@/app/hooks/useAuthGuard";
+import InstructorAssessments from "./components/InstructorAssessments";
 
 export default function InstructorDashboard() {
     const formatTo12Hr = (timeStr: string) => {
@@ -54,7 +55,7 @@ export default function InstructorDashboard() {
     const [materialLinks, setMaterialLinks] = useState<Record<string, string>>({});
     const [materialMessages, setMaterialMessages] = useState<Record<string, string>>({});
     const [manageBatch, setManageBatch] = useState<any>(null);
-    const [manageBatchTab, setManageBatchTab] = useState<'scheduling' | 'attendance' | 'resources' | 'guidelines'>('scheduling');
+    const [manageBatchTab, setManageBatchTab] = useState<'scheduling' | 'attendance' | 'resources' | 'guidelines' | 'assessments'>('scheduling');
     const [broadcastMessage, setBroadcastMessage] = useState("");
     const [broadcastMode, setBroadcastMode] = useState<'portal' | 'email' | 'both'>('both');
     const [broadcastLoading, setBroadcastLoading] = useState(false);
@@ -582,6 +583,7 @@ export default function InstructorDashboard() {
         { title: "Total Batches", value: stats?.totalBatches || 0, icon: <Layers className="w-6 h-6 text-foreground" /> },
         { title: "Active Batches", value: stats?.activeBatches || 0, icon: <CalendarCheck className="w-6 h-6 text-foreground" /> },
         { title: "Total Students", value: stats?.totalStudents || 0, icon: <Users className="w-6 h-6 text-foreground" /> },
+        { title: "Assessments", value: `${stats?.instructorAssessments || 0} (${stats?.instructorPassRate || 0}%)`, icon: <Award className="w-6 h-6 text-foreground" /> },
     ];
 
     const isManageInteractive = manageBatch && manageBatch.is_finalized === 1 && manageBatch.batch_status === 'active';
@@ -755,7 +757,7 @@ export default function InstructorDashboard() {
                     <div className="max-w-7xl mx-auto space-y-10">
             {activeTab === 'analytics' && !manageBatch && (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                         {statCards.map((stat, idx) => (
                             <div key={idx} className={`glass-panel p-8 rounded-[2rem] border border-primary/10 bg-card/40 backdrop-blur-xl flex items-center justify-between shadow-xl shadow-primary/5 hover:border-primary/30 transition-all duration-500 hover:scale-[1.02]`}>
                                 <div>
@@ -907,6 +909,7 @@ export default function InstructorDashboard() {
                             { id: 'scheduling', label: 'Scheduling', icon: <PlayCircle className="w-4 h-4" /> },
                             { id: 'attendance', label: 'Attendance', icon: <CalendarCheck className="w-4 h-4" /> },
                             { id: 'resources', label: 'General Announcements & Resources', icon: <FileText className="w-4 h-4" /> },
+                            { id: 'assessments', label: 'Assessments', icon: <Award className="w-4 h-4" /> },
                             { id: 'guidelines', label: 'Guidelines & Policies', icon: <Shield className="w-4 h-4" />, hidden: manageBatch.is_finalized === 1 }
                         ].filter(tab => !tab.hidden).map(tab => (
                             <button
@@ -1410,6 +1413,10 @@ export default function InstructorDashboard() {
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {manageBatchTab === 'assessments' && (
+                                <InstructorAssessments courseId={manageBatch.course_id} batchId={manageBatch.id} />
                             )}
                         </div>
 

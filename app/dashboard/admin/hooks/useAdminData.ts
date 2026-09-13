@@ -135,6 +135,53 @@ export const useAdminData = () => {
     const [syllabusData, setSyllabusData] = useState<any>(null);
     const [syllabusLoading, setSyllabusLoading] = useState(false);
 
+    // Assessment Management State
+    const [adminAssessments, setAdminAssessments] = useState<any[]>([]);
+    const [adminAssessmentsLoading, setAdminAssessmentsLoading] = useState(false);
+    const [showCreateAssessmentModal, setShowCreateAssessmentModal] = useState(false);
+    const [showEditAssessmentModal, setShowEditAssessmentModal] = useState(false);
+    const [editingAssessment, setEditingAssessment] = useState<any>(null);
+    const [assessmentForm, setAssessmentForm] = useState({
+        title: "",
+        description: "",
+        module_id: "",
+        pass_percentage: 70,
+        time_limit_mins: 0,
+        max_attempts: 3,
+        status: "active"
+    });
+    const [editAssessmentForm, setEditAssessmentForm] = useState({
+        id: -1,
+        title: "",
+        description: "",
+        module_id: "",
+        pass_percentage: 70,
+        time_limit_mins: 0,
+        max_attempts: 3,
+        status: "active"
+    });
+
+    const [showQuestionManagerModal, setShowQuestionManagerModal] = useState(false);
+    const [selectedAssessmentForQuestions, setSelectedAssessmentForQuestions] = useState<any>(null);
+    const [questionsData, setQuestionsData] = useState<any[]>([]);
+    const [questionsLoading, setQuestionsLoading] = useState(false);
+    const [showQuestionModal, setShowQuestionModal] = useState(false);
+    const [editingQuestion, setEditingQuestion] = useState<any>(null);
+    const [questionForm, setQuestionForm] = useState({
+        id: -1,
+        question_text: "",
+        question_type: "mcq",
+        options: ["", "", "", ""],
+        correct_option_index: 0,
+        points: 1,
+        sequence_order: 1
+    });
+
+    const [showAssessmentResultsModal, setShowAssessmentResultsModal] = useState(false);
+    const [selectedAssessmentForResults, setSelectedAssessmentForResults] = useState<any>(null);
+    const [assessmentResultsData, setAssessmentResultsData] = useState<any[]>([]);
+    const [resultsLoading, setResultsLoading] = useState(false);
+
     const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
     const [showEditModuleModal, setShowEditModuleModal] = useState(false);
     const [showCreateLessonModal, setShowCreateLessonModal] = useState(false);
@@ -835,14 +882,249 @@ export const useAdminData = () => {
         }
     };
 
+    const fetchCourseAssessments = async (courseId: number) => {
+        setAdminAssessmentsLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/course/${courseId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAdminAssessments(res.data.assessments || []);
+        } catch (err: any) {
+            console.error("Failed to load admin assessments", err);
+        } finally {
+            setAdminAssessmentsLoading(false);
+        }
+    };
+
     const openSyllabusManager = (course: any) => {
         setSelectedCourseForSyllabus(course);
         fetchSyllabus(course.id);
+        fetchCourseAssessments(course.id);
     };
 
     const closeSyllabusManager = () => {
         setSelectedCourseForSyllabus(null);
         setSyllabusData(null);
+        setAdminAssessments([]);
+    };
+
+    const openCreateAssessmentModal = (courseId: number) => {
+        setAssessmentForm({
+            title: "",
+            description: "",
+            module_id: "",
+            pass_percentage: 70,
+            time_limit_mins: 0,
+            max_attempts: 3,
+            status: "active"
+        });
+        setShowCreateAssessmentModal(true);
+    };
+
+    const handleCreateAssessmentSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!assessmentForm.title || !assessmentForm.title.trim()) {
+            return showToast("Assessment title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const payload = {
+                course_id: selectedCourseForSyllabus.id,
+                module_id: assessmentForm.module_id ? Number(assessmentForm.module_id) : null,
+                title: assessmentForm.title.trim(),
+                description: assessmentForm.description,
+                pass_percentage: Number(assessmentForm.pass_percentage),
+                time_limit_mins: Number(assessmentForm.time_limit_mins),
+                max_attempts: Number(assessmentForm.max_attempts),
+                status: assessmentForm.status
+            };
+            await axios.post(API_ENDPOINTS.ASSESSMENTS, payload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowCreateAssessmentModal(false);
+            fetchCourseAssessments(selectedCourseForSyllabus.id);
+            showToast("Assessment created successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to create assessment", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const openEditAssessmentModal = (ass: any) => {
+        setEditingAssessment(ass);
+        setEditAssessmentForm({
+            id: ass.id,
+            title: ass.title || "",
+            description: ass.description || "",
+            module_id: ass.module_id ? String(ass.module_id) : "",
+            pass_percentage: Number(ass.pass_percentage || 70),
+            time_limit_mins: Number(ass.time_limit_mins || 0),
+            max_attempts: Number(ass.max_attempts || 3),
+            status: ass.status || "active"
+        });
+        setShowEditAssessmentModal(true);
+    };
+
+    const handleEditAssessmentSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editAssessmentForm.title || !editAssessmentForm.title.trim()) {
+            return showToast("Assessment title is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.put(`${API_ENDPOINTS.ASSESSMENTS}/${editAssessmentForm.id}`, editAssessmentForm, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setShowEditAssessmentModal(false);
+            fetchCourseAssessments(selectedCourseForSyllabus.id);
+            showToast("Assessment updated successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to update assessment", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleDeleteAssessment = async (assessmentId: number) => {
+        if (!confirm("Are you sure you want to delete this assessment? All associated questions and student attempts will also be permanently deleted.")) return;
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.delete(`${API_ENDPOINTS.ASSESSMENTS}/${assessmentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchCourseAssessments(selectedCourseForSyllabus.id);
+            showToast("Assessment deleted successfully!", "success");
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to delete assessment", "error");
+        }
+    };
+
+    const openQuestionManager = (ass: any) => {
+        setSelectedAssessmentForQuestions(ass);
+        setQuestionsData(ass.questions || []);
+        setShowQuestionManagerModal(true);
+    };
+
+    const openCreateQuestionModal = () => {
+        const nextSeq = (questionsData?.length || 0) + 1;
+        setEditingQuestion(null);
+        setQuestionForm({
+            id: -1,
+            question_text: "",
+            question_type: "mcq",
+            options: ["", "", "", ""],
+            correct_option_index: 0,
+            points: 1,
+            sequence_order: nextSeq
+        });
+        setShowQuestionModal(true);
+    };
+
+    const openEditQuestionModal = (q: any) => {
+        setEditingQuestion(q);
+        const optionsList = Array.isArray(q.options) ? q.options : ["Option 1", "Option 2", "Option 3", "Option 4"];
+        setQuestionForm({
+            id: q.id,
+            question_text: q.question_text || "",
+            question_type: q.question_type || "mcq",
+            options: optionsList,
+            correct_option_index: Number(q.correct_option_index || 0),
+            points: Number(q.points || 1),
+            sequence_order: Number(q.sequence_order || 1)
+        });
+        setShowQuestionModal(true);
+    };
+
+    const handleSaveQuestionSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!questionForm.question_text || !questionForm.question_text.trim()) {
+            return showToast("Question text is required.", "error");
+        }
+        setFormLoading(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const payload = {
+                question_text: questionForm.question_text.trim(),
+                question_type: questionForm.question_type,
+                options_json: questionForm.question_type === 'tf' ? ["True", "False"] : questionForm.options,
+                correct_option_index: Number(questionForm.correct_option_index),
+                points: Number(questionForm.points),
+                sequence_order: Number(questionForm.sequence_order)
+            };
+
+            if (editingQuestion) {
+                await axios.put(`${API_ENDPOINTS.ASSESSMENTS}/questions/${editingQuestion.id}`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                showToast("Question updated successfully!", "success");
+            } else {
+                await axios.post(`${API_ENDPOINTS.ASSESSMENTS}/${selectedAssessmentForQuestions.id}/questions`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                showToast("Question added successfully!", "success");
+            }
+            setShowQuestionModal(false);
+
+            // Refresh questions & course assessments
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/course/${selectedCourseForSyllabus.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAdminAssessments(res.data.assessments || []);
+            const updatedAss = res.data.assessments?.find((a: any) => a.id === selectedAssessmentForQuestions.id);
+            if (updatedAss) {
+                setSelectedAssessmentForQuestions(updatedAss);
+                setQuestionsData(updatedAss.questions || []);
+            }
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to save question", "error");
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleDeleteQuestion = async (questionId: number) => {
+        if (!confirm("Delete this question?")) return;
+        try {
+            const token = localStorage.getItem("snagup_token");
+            await axios.delete(`${API_ENDPOINTS.ASSESSMENTS}/questions/${questionId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            showToast("Question deleted successfully!", "success");
+
+            // Refresh
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/course/${selectedCourseForSyllabus.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAdminAssessments(res.data.assessments || []);
+            const updatedAss = res.data.assessments?.find((a: any) => a.id === selectedAssessmentForQuestions.id);
+            if (updatedAss) {
+                setSelectedAssessmentForQuestions(updatedAss);
+                setQuestionsData(updatedAss.questions || []);
+            }
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to delete question", "error");
+        }
+    };
+
+    const openAssessmentResults = async (ass: any) => {
+        setSelectedAssessmentForResults(ass);
+        setResultsLoading(true);
+        setShowAssessmentResultsModal(true);
+        try {
+            const token = localStorage.getItem("snagup_token");
+            const res = await axios.get(`${API_ENDPOINTS.ASSESSMENTS}/${ass.id}/results`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAssessmentResultsData(res.data.attempts || []);
+        } catch (err: any) {
+            showToast(err.response?.data?.error || "Failed to load assessment results", "error");
+        } finally {
+            setResultsLoading(false);
+        }
     };
 
     const openCreateModuleModal = (courseId: number) => {
@@ -1705,6 +1987,27 @@ export const useAdminData = () => {
         editModuleForm, setEditModuleForm,
         lessonForm, setLessonForm,
         editLessonForm, setEditLessonForm,
+
+        // Assessment State & Actions
+        adminAssessments, setAdminAssessments, adminAssessmentsLoading,
+        showCreateAssessmentModal, setShowCreateAssessmentModal,
+        showEditAssessmentModal, setShowEditAssessmentModal,
+        editingAssessment, setEditingAssessment,
+        assessmentForm, setAssessmentForm,
+        editAssessmentForm, setEditAssessmentForm,
+        showQuestionManagerModal, setShowQuestionManagerModal,
+        selectedAssessmentForQuestions, setSelectedAssessmentForQuestions,
+        questionsData, setQuestionsData, questionsLoading,
+        showQuestionModal, setShowQuestionModal,
+        editingQuestion, setEditingQuestion,
+        questionForm, setQuestionForm,
+        showAssessmentResultsModal, setShowAssessmentResultsModal,
+        selectedAssessmentForResults, setSelectedAssessmentForResults,
+        assessmentResultsData, setAssessmentResultsData, resultsLoading,
+        fetchCourseAssessments, openCreateAssessmentModal, handleCreateAssessmentSubmit,
+        openEditAssessmentModal, handleEditAssessmentSubmit, handleDeleteAssessment,
+        openQuestionManager, openCreateQuestionModal, openEditQuestionModal, handleSaveQuestionSubmit,
+        handleDeleteQuestion, openAssessmentResults,
 
         // Filtered Data
         filteredCourses, filteredBatches, filteredPayments, filteredInquiries, filteredAttendance, filteredStudents, attendanceBatches, emailLogs,

@@ -7,18 +7,7 @@ export default function Root() {
   const router = useRouter();
 
   useEffect(() => {
-    const user = localStorage.getItem("snagup_user");
-    if (user) {
-      try {
-        const parsed = JSON.parse(user);
-        if (parsed?.role) {
-          router.replace(`/dashboard/${parsed.role}`);
-          return;
-        }
-      } catch (e) {
-        // Fall back to home if user data is corrupt
-      }
-    }
+    // All users entering root / are directed to the main SnagUp website experience (/home)
     router.replace("/home");
   }, [router]);
 
@@ -28,3 +17,4 @@ export default function Root() {
     </div>
   );
 }
+

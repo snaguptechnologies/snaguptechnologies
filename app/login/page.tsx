@@ -26,9 +26,20 @@ export default function Login() {
             try {
                 const user = JSON.parse(userStr);
                 if (user?.role) {
-                    const selectedCourse = localStorage.getItem("snagup_selected_course");
-                    if (selectedCourse && user.role === "student") {
-                        router.replace(`/home?apply_course=${encodeURIComponent(selectedCourse)}`);
+                    const params = new URLSearchParams(window.location.search);
+                    const urlCourseId = params.get("apply_course_id");
+                    const urlCourseName = params.get("apply_course");
+                    const selectedCourseId = urlCourseId || localStorage.getItem("snagup_selected_course_id");
+                    const selectedCourse = urlCourseName || localStorage.getItem("snagup_selected_course");
+
+                    if (user.role === "student") {
+                        if (selectedCourseId) {
+                            router.replace(`/home?apply_course_id=${encodeURIComponent(selectedCourseId)}#batches`);
+                        } else if (selectedCourse) {
+                            router.replace(`/home?apply_course=${encodeURIComponent(selectedCourse)}#batches`);
+                        } else {
+                            router.replace("/home");
+                        }
                     } else {
                         router.replace(`/dashboard/${user.role}`);
                     }
@@ -37,7 +48,6 @@ export default function Login() {
                 // Corrupt data — let them see the login form
             }
         }
-
     }, [router]);
 
     const [email, setEmail] = useState("");
@@ -108,9 +118,20 @@ export default function Login() {
             localStorage.setItem("snagup_token", res.data.token);
             localStorage.setItem("snagup_user", JSON.stringify(res.data.user));
 
-            const selectedCourse = localStorage.getItem("snagup_selected_course");
-            if (selectedCourse && res.data.user.role === "student") {
-                router.push(`/home?apply_course=${encodeURIComponent(selectedCourse)}`);
+            const params = new URLSearchParams(window.location.search);
+            const urlCourseId = params.get("apply_course_id");
+            const urlCourseName = params.get("apply_course");
+            const selectedCourseId = urlCourseId || localStorage.getItem("snagup_selected_course_id");
+            const selectedCourse = urlCourseName || localStorage.getItem("snagup_selected_course");
+
+            if (res.data.user.role === "student") {
+                if (selectedCourseId) {
+                    router.push(`/home?apply_course_id=${encodeURIComponent(selectedCourseId)}#batches`);
+                } else if (selectedCourse) {
+                    router.push(`/home?apply_course=${encodeURIComponent(selectedCourse)}#batches`);
+                } else {
+                    router.push("/home");
+                }
             } else {
                 router.push(`/dashboard/${res.data.user.role}`);
             }

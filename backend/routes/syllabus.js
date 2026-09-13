@@ -222,7 +222,7 @@ router.delete('/lessons/:lessonId', authenticateToken, requireRole('admin'), asy
     }
 });
 
-// GET /api/syllabus/student/course/:courseId - Student fetch active syllabus
+// GET /api/syllabus/student/course/:courseId - Student fetch active syllabus with completion state & progress
 router.get('/student/course/:courseId', authenticateToken, requireRole('student'), async (req, res) => {
     const { courseId } = req.params;
     const studentId = req.user.id;
@@ -254,6 +254,20 @@ router.get('/student/course/:courseId', authenticateToken, requireRole('student'
             ORDER BY sequence_order ASC, id ASC
         `, [courseId]);
 
+        // Fetch student's completed lesson IDs for this course
+        const [completedRows] = await db.execute(`
+            SELECT lc.lesson_id
+            FROM lesson_completions lc
+            JOIN course_lessons cl ON lc.lesson_id = cl.id
+            JOIN course_modules cm ON cl.module_id = cm.id
+            WHERE lc.student_id = ? AND cm.course_id = ?
+        `, [studentId, courseId]);
+
+        const completedSet = new Set(completedRows.map(r => r.lesson_id));
+
+        let totalLessonsCount = 0;
+        let completedLessonsCount = 0;
+
         // Fetch active lessons for each active module
         for (let mod of modules) {
             const [lessons] = await db.execute(`
@@ -262,16 +276,171 @@ router.get('/student/course/:courseId', authenticateToken, requireRole('student'
                 WHERE module_id = ? AND status = 'active'
                 ORDER BY sequence_order ASC, id ASC
             `, [mod.id]);
+
+            for (let lesson of lessons) {
+                const isComp = completedSet.has(lesson.id);
+                lesson.completed = isComp;
+                totalLessonsCount++;
+                if (isComp) completedLessonsCount++;
+            }
             mod.lessons = lessons;
         }
 
+        const percentage = totalLessonsCount > 0 ? Math.round((completedLessonsCount / totalLessonsCount) * 100) : 0;
+
+        // Fetch Assessment Progress
+        const [assessmentsCountRows] = await db.execute(`
+            SELECT COUNT(id) as total_assessments
+            FROM assessments
+            WHERE course_id = ? AND status = 'active'
+        `, [courseId]);
+
+        const [passedAssessmentsRows] = await db.execute(`
+            SELECT COUNT(DISTINCT a.id) as passed_assessments
+            FROM assessments a
+            JOIN assessment_attempts aa ON a.id = aa.assessment_id
+            WHERE a.course_id = ? AND a.status = 'active' 
+              AND aa.student_id = ? AND aa.is_passed = 1
+        `, [courseId, studentId]);
+
+        const totalAssessments = assessmentsCountRows[0].total_assessments || 0;
+        const passedAssessments = passedAssessmentsRows[0].passed_assessments || 0;
+
+        const combinedTotal = totalLessonsCount + totalAssessments;
+        const combinedCompleted = completedLessonsCount + passedAssessments;
+        const combinedPercentage = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
+
         res.json({
             course,
-            modules
+            modules,
+            lesson_progress: {
+                completed: completedLessonsCount,
+                total: totalLessonsCount,
+                percentage
+            },
+            assessment_progress: {
+                passed: passedAssessments,
+                total: totalAssessments
+            },
+            course_progress: {
+                completed: combinedCompleted,
+                total: combinedTotal,
+                percentage: combinedPercentage
+            }
         });
     } catch (err) {
         console.error('Student Syllabus Fetch Error:', err);
         res.status(500).json({ error: 'Failed to fetch syllabus' });
+    }
+});
+
+// POST /api/syllabus/lessons/:lessonId/toggle-complete - Student toggle lesson completion
+router.post('/lessons/:lessonId/toggle-complete', authenticateToken, requireRole('student'), async (req, res) => {
+    const { lessonId } = req.params;
+    const studentId = req.user.id;
+
+    try {
+        // 1. Verify authorization: lesson exists and student has approved enrollment in the course that owns this lesson
+        const [authRows] = await db.execute(`
+            SELECT cl.id as lesson_id, cm.course_id
+            FROM course_lessons cl
+            JOIN course_modules cm ON cl.module_id = cm.id
+            JOIN batches b ON b.course_id = cm.course_id
+            JOIN enrollments e ON e.batch_id = b.id
+            WHERE cl.id = ? AND e.student_id = ? AND e.status = 'approved'
+            LIMIT 1
+        `, [lessonId, studentId]);
+
+        if (authRows.length === 0) {
+            return res.status(403).json({ error: 'Access denied. Lesson not found or you do not have an approved enrollment for this course.' });
+        }
+
+        const courseId = authRows[0].course_id;
+
+        // 2. Check if completion record exists
+        const [existing] = await db.execute(`
+            SELECT id FROM lesson_completions WHERE student_id = ? AND lesson_id = ?
+        `, [studentId, lessonId]);
+
+        let isCompleted = false;
+
+        if (existing.length > 0) {
+            // Delete completion record (toggle off)
+            await db.execute(`
+                DELETE FROM lesson_completions WHERE student_id = ? AND lesson_id = ?
+            `, [studentId, lessonId]);
+            isCompleted = false;
+        } else {
+            // Insert completion record (toggle on)
+            await db.execute(`
+                INSERT IGNORE INTO lesson_completions (student_id, lesson_id) VALUES (?, ?)
+            `, [studentId, lessonId]);
+            isCompleted = true;
+        }
+
+        // 3. Compute updated lesson progress for this course
+        const [totalRows] = await db.execute(`
+            SELECT COUNT(cl.id) as total
+            FROM course_lessons cl
+            JOIN course_modules cm ON cl.module_id = cm.id
+            WHERE cm.course_id = ? AND cm.status = 'active' AND cl.status = 'active'
+        `, [courseId]);
+
+        const [compRows] = await db.execute(`
+            SELECT COUNT(lc.id) as completed
+            FROM lesson_completions lc
+            JOIN course_lessons cl ON lc.lesson_id = cl.id
+            JOIN course_modules cm ON cl.module_id = cm.id
+            WHERE lc.student_id = ? AND cm.course_id = ? AND cm.status = 'active' AND cl.status = 'active'
+        `, [studentId, courseId]);
+
+        const total = totalRows[0]?.total || 0;
+        const completed = compRows[0]?.completed || 0;
+        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        // Fetch Assessment Progress
+        const [assessmentsCountRows] = await db.execute(`
+            SELECT COUNT(id) as total_assessments
+            FROM assessments
+            WHERE course_id = ? AND status = 'active'
+        `, [courseId]);
+
+        const [passedAssessmentsRows] = await db.execute(`
+            SELECT COUNT(DISTINCT a.id) as passed_assessments
+            FROM assessments a
+            JOIN assessment_attempts aa ON a.id = aa.assessment_id
+            WHERE a.course_id = ? AND a.status = 'active' 
+              AND aa.student_id = ? AND aa.is_passed = 1
+        `, [courseId, studentId]);
+
+        const totalAssessments = assessmentsCountRows[0].total_assessments || 0;
+        const passedAssessments = passedAssessmentsRows[0].passed_assessments || 0;
+
+        const combinedTotal = total + totalAssessments;
+        const combinedCompleted = completed + passedAssessments;
+        const combinedPercentage = combinedTotal > 0 ? Math.round((combinedCompleted / combinedTotal) * 100) : 0;
+
+        res.json({
+            completed: isCompleted,
+            lesson_id: Number(lessonId),
+            lesson_progress: {
+                completed,
+                total,
+                percentage
+            },
+            assessment_progress: {
+                passed: passedAssessments,
+                total: totalAssessments
+            },
+            course_progress: {
+                completed: combinedCompleted,
+                total: combinedTotal,
+                percentage: combinedPercentage
+            }
+        });
+    } catch (err) {
+        console.error('Toggle Lesson Completion Error:', err);
+        res.status(500).json({ error: 'Failed to toggle lesson completion' });
     }
 });
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { 
     BookOpen, Layers, Plus, Edit2, Trash2, ChevronDown, ChevronRight, 
-    Link as LinkIcon, Video, CheckCircle, XCircle, ArrowLeft, Loader2, Power, FileText, AlertCircle 
+    Link as LinkIcon, Video, CheckCircle, XCircle, ArrowLeft, Loader2, Power, FileText, AlertCircle, Award, HelpCircle, Clock, BarChart3
 } from 'lucide-react';
 
 interface SyllabusTabProps {
@@ -19,6 +19,14 @@ interface SyllabusTabProps {
     openEditLessonModal: (lesson: any) => void;
     handleDeleteLesson: (lessonId: number) => void;
     handleToggleLessonStatus: (lessonId: number, currentStatus: string) => void;
+    // Assessment Props
+    adminAssessments?: any[];
+    adminAssessmentsLoading?: boolean;
+    openCreateAssessmentModal?: (courseId: number) => void;
+    openEditAssessmentModal?: (assessment: any) => void;
+    handleDeleteAssessment?: (assessmentId: number) => void;
+    openQuestionManager?: (assessment: any) => void;
+    openAssessmentResults?: (assessment: any) => void;
 }
 
 const SyllabusTab: React.FC<SyllabusTabProps> = ({
@@ -33,8 +41,17 @@ const SyllabusTab: React.FC<SyllabusTabProps> = ({
     openCreateLessonModal,
     openEditLessonModal,
     handleDeleteLesson,
-    handleToggleLessonStatus
+    handleToggleLessonStatus,
+    adminAssessments = [],
+    adminAssessmentsLoading = false,
+    openCreateAssessmentModal,
+    openEditAssessmentModal,
+    handleDeleteAssessment,
+    openQuestionManager,
+    openAssessmentResults
 }) => {
+    // Sub tab state: modules or assessments
+    const [activeSubTab, setActiveSubTab] = useState<'modules' | 'assessments'>('modules');
     // Keep track of open module accordions
     const [expandedModules, setExpandedModules] = useState<{ [key: number]: boolean }>({});
 
@@ -77,25 +94,60 @@ const SyllabusTab: React.FC<SyllabusTabProps> = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => openCreateModuleModal(course.id)}
-                        className="flex items-center justify-center gap-2 px-6 py-3.5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black transition-all shadow-xl shadow-foreground/10 uppercase tracking-widest text-xs"
-                    >
-                        <Plus className="w-4.5 h-4.5" /> ADD MODULE
-                    </button>
+                    {activeSubTab === 'modules' ? (
+                        <button
+                            onClick={() => openCreateModuleModal(course.id)}
+                            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-foreground hover:opacity-90 text-background rounded-2xl font-black transition-all shadow-xl shadow-foreground/10 uppercase tracking-widest text-xs"
+                        >
+                            <Plus className="w-4.5 h-4.5" /> ADD MODULE
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => openCreateAssessmentModal && openCreateAssessmentModal(course.id)}
+                            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-amber-950 rounded-2xl font-black transition-all shadow-xl shadow-amber-500/20 uppercase tracking-widest text-xs"
+                        >
+                            <Plus className="w-4.5 h-4.5" /> CREATE ASSESSMENT
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* LOADING STATE */}
-            {syllabusLoading ? (
-                <div className="py-32 flex flex-col items-center justify-center gap-4">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin" strokeWidth={3} />
-                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Loading course syllabus architecture...</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {modules.map((mod: any) => {
-                        const isExpanded = expandedModules[mod.id] ?? true; // Default expanded
+            {/* SUB TAB NAVIGATION */}
+            <div className="flex items-center gap-2 p-1 bg-muted/40 rounded-2xl w-fit border border-border/50">
+                <button
+                    onClick={() => setActiveSubTab('modules')}
+                    className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        activeSubTab === 'modules'
+                            ? "bg-background text-primary shadow-lg shadow-primary/5 border border-primary/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                >
+                    <BookOpen className="w-4 h-4" /> Curriculum & Modules
+                </button>
+                <button
+                    onClick={() => setActiveSubTab('assessments')}
+                    className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        activeSubTab === 'assessments'
+                            ? "bg-background text-amber-500 shadow-lg shadow-amber-500/5 border border-amber-500/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                >
+                    <Award className="w-4 h-4" /> Assessments & Quizzes ({adminAssessments.length})
+                </button>
+            </div>
+
+            {/* SUB TAB CONTENT */}
+            {activeSubTab === 'modules' ? (
+                /* LOADING STATE */
+                syllabusLoading ? (
+                    <div className="py-32 flex flex-col items-center justify-center gap-4">
+                        <Loader2 className="w-10 h-10 text-primary animate-spin" strokeWidth={3} />
+                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Loading course syllabus architecture...</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {modules.map((mod: any) => {
+                            const isExpanded = expandedModules[mod.id] ?? true; // Default expanded
                         const isActive = mod.status === 'active';
                         const lessons = mod.lessons || [];
 
@@ -300,6 +352,132 @@ const SyllabusTab: React.FC<SyllabusTabProps> = ({
                         </div>
                     )}
                 </div>
+                )
+            ) : (
+                /* ASSESSMENTS TAB CONTENT */
+                adminAssessmentsLoading ? (
+                    <div className="py-32 flex flex-col items-center justify-center gap-4">
+                        <Loader2 className="w-10 h-10 text-amber-500 animate-spin" strokeWidth={3} />
+                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Loading course assessments...</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {adminAssessments.length === 0 ? (
+                            <div className="py-24 text-center rounded-2xl border border-border/20 bg-card/30 backdrop-blur-sm p-8 space-y-4">
+                                <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mx-auto">
+                                    <Award className="w-8 h-8" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black text-foreground uppercase tracking-widest">No Assessments Created Yet</h3>
+                                    <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
+                                        Click "+ CREATE ASSESSMENT" above to add module quizzes or course-wide evaluation exams.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-4">
+                                {adminAssessments.map((ass: any) => {
+                                    const isAssActive = ass.status === 'active';
+
+                                    return (
+                                        <div 
+                                            key={ass.id}
+                                            className="bg-card/40 border border-border/30 rounded-2xl p-6 backdrop-blur-sm shadow-md transition-all space-y-4"
+                                        >
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-3">
+                                                        {ass.module_title ? (
+                                                            <span className="px-2.5 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider">
+                                                                Module: {ass.module_title}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider">
+                                                                Course Assessment
+                                                            </span>
+                                                        )}
+
+                                                        {isAssActive ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase">
+                                                                <CheckCircle className="w-3 h-3" /> Active
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-black uppercase">
+                                                                <XCircle className="w-3 h-3" /> Inactive
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <h3 className="text-xl font-black text-foreground tracking-tight">
+                                                        {ass.title}
+                                                    </h3>
+                                                    {ass.description && (
+                                                        <p className="text-xs text-muted-foreground font-medium max-w-3xl">
+                                                            {ass.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-2 self-end md:self-auto shrink-0">
+                                                    <button
+                                                        onClick={() => openQuestionManager && openQuestionManager(ass)}
+                                                        className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all border border-amber-500/20 flex items-center gap-1.5 text-xs font-bold"
+                                                        title="Manage Questions"
+                                                    >
+                                                        <HelpCircle className="w-4 h-4" /> Questions ({ass.question_count || 0})
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => openAssessmentResults && openAssessmentResults(ass)}
+                                                        className="px-4 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20 flex items-center gap-1.5 text-xs font-bold"
+                                                        title="View Student Submissions"
+                                                    >
+                                                        <BarChart3 className="w-4 h-4" /> Results
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => openEditAssessmentModal && openEditAssessmentModal(ass)}
+                                                        className="p-2 rounded-xl bg-muted/40 hover:bg-muted text-foreground transition-all border border-border/20"
+                                                        title="Edit Assessment"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleDeleteAssessment && handleDeleteAssessment(ass.id)}
+                                                        className="p-2 rounded-xl text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all border border-border/20"
+                                                        title="Delete Assessment"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border/20">
+                                                <div className="p-2.5 bg-muted/20 rounded-xl space-y-0.5">
+                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Questions</p>
+                                                    <p className="text-xs font-black text-foreground">{ass.question_count || 0} Questions</p>
+                                                </div>
+                                                <div className="p-2.5 bg-muted/20 rounded-xl space-y-0.5">
+                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Pass Threshold</p>
+                                                    <p className="text-xs font-black text-amber-500">{ass.pass_percentage}% Marks</p>
+                                                </div>
+                                                <div className="p-2.5 bg-muted/20 rounded-xl space-y-0.5">
+                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Time Limit</p>
+                                                    <p className="text-xs font-black text-foreground">{ass.time_limit_mins > 0 ? `${ass.time_limit_mins} Mins` : 'No Limit'}</p>
+                                                </div>
+                                                <div className="p-2.5 bg-muted/20 rounded-xl space-y-0.5">
+                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Max Attempts</p>
+                                                    <p className="text-xs font-black text-foreground">{ass.max_attempts > 0 ? ass.max_attempts : 'Unlimited'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )
             )}
         </div>
     );

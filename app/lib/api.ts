@@ -23,5 +23,6 @@ export const API_ENDPOINTS = {
     APPLICATIONS: `${BASE_URL}/applications`,
     ACTIVITIES: `${BASE_URL}/applications/activities`,
     SYLLABUS: `${BASE_URL}/syllabus`,
+    ASSESSMENTS: `${BASE_URL}/assessments`,
 };
 

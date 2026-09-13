@@ -37,7 +37,19 @@ export default function Register() {
             localStorage.setItem("snagup_token", res.data.token);
             localStorage.setItem("snagup_user", JSON.stringify(res.data.user));
 
-            router.push(`/dashboard/student`);
+            const params = new URLSearchParams(window.location.search);
+            const urlCourseId = params.get("apply_course_id");
+            const urlCourseName = params.get("apply_course");
+            const selectedCourseId = urlCourseId || localStorage.getItem("snagup_selected_course_id");
+            const selectedCourse = urlCourseName || localStorage.getItem("snagup_selected_course");
+
+            if (selectedCourseId) {
+                router.push(`/home?apply_course_id=${encodeURIComponent(selectedCourseId)}#batches`);
+            } else if (selectedCourse) {
+                router.push(`/home?apply_course=${encodeURIComponent(selectedCourse)}#batches`);
+            } else {
+                router.push(`/dashboard/student`);
+            }
         } catch (err: any) {
             setError(err.response?.data?.error || "Registration failed. Please try again.");
         } finally {
