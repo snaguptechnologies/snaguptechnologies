@@ -82,7 +82,7 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
       if (passedCount < totalAssessments) {
          return {
            success: false,
-           error: \`Student has only passed \${passedCount} of \${totalAssessments} required course assessments.\`
+           error: `Student has only passed ${passedCount} of ${totalAssessments} required course assessments.`
          };
       }
     }
