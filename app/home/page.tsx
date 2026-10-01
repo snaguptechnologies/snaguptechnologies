@@ -291,6 +291,7 @@ export default function HomePage() {
     // Certificate Verification State
     const [certId, setCertId] = useState("");
     const [verifying, setVerifying] = useState(false);
+    const [verificationResponse, setVerificationResponse] = useState<any>(null);
     const [verificationResult, setVerificationResult] = useState<any>(null);
     const [verificationError, setVerificationError] = useState("");
 
@@ -302,8 +303,10 @@ export default function HomePage() {
         setVerifying(true);
         setVerificationError("");
         setVerificationResult(null);
+        setVerificationResponse(null);
         try {
             const res = await axios.get(`${API_ENDPOINTS.CERTIFICATES}/verify/${targetId.trim()}`);
+            setVerificationResponse(res.data);
             setVerificationResult(res.data.certificate);
             
             if (overrideId) {
@@ -312,7 +315,7 @@ export default function HomePage() {
                 }, 100);
             }
         } catch (err: any) {
-            setVerificationError(err.response?.data?.error || "Invalid Certificate ID. Please check and try again.");
+            setVerificationError(err.response?.data?.message || err.response?.data?.error || "Certificate Not Found. The certificate ID could not be verified in the SnagUp certificate registry.");
         } finally {
             setVerifying(false);
         }
@@ -1201,32 +1204,85 @@ export default function HomePage() {
                                                 exit={{ opacity: 0, height: 0 }}
                                                 className="mt-10 pt-10 border-t border-border"
                                             >
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                    <div className="flex items-start gap-6">
-                                                        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                                                            <CheckCircle className="w-8 h-8 text-emerald-500" />
+                                                {verificationResponse?.status === 'REVOKED' || verificationResult.status === 'REVOKED' ? (
+                                                    <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 space-y-4">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                                                                <X className="w-6 h-6 text-rose-500" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-xl font-black uppercase tracking-tight">Certificate Revoked</h4>
+                                                                <p className="text-xs text-rose-400/90 font-medium mt-1">This certificate was previously issued but is no longer considered valid.</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Authenticity Confirmed</p>
-                                                            <h4 className="text-2xl font-black text-foreground leading-tight">{verificationResult.student_name}</h4>
-                                                            <p className="text-muted-foreground text-sm mt-1">Verified Graduate</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        <div className="flex justify-between py-2 border-b border-border/50">
-                                                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Program</span>
-                                                            <span className="text-sm font-bold text-foreground">{verificationResult.course_name}</span>
-                                                        </div>
-                                                        <div className="flex justify-between py-2 border-b border-border/50">
-                                                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Issue Date</span>
-                                                            <span className="text-sm font-bold text-foreground">{new Date(verificationResult.issued_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                                        </div>
-                                                        <div className="flex justify-between py-2">
-                                                            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Instructor</span>
-                                                            <span className="text-sm font-bold text-foreground">{verificationResult.instructor_name}</span>
+                                                        <div className="pt-4 border-t border-rose-500/20 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-foreground">
+                                                            <div><span className="text-muted-foreground uppercase text-[10px]">ID:</span> {verificationResult.cert_id}</div>
+                                                            <div><span className="text-muted-foreground uppercase text-[10px]">Student:</span> {verificationResult.student_name}</div>
+                                                            <div><span className="text-muted-foreground uppercase text-[10px]">Course:</span> {verificationResult.course_name}</div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className="space-y-8">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                            <div className="flex items-start gap-6">
+                                                                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                                                    <CheckCircle className="w-8 h-8 text-emerald-500" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">✓ Certificate Verified</p>
+                                                                    <h4 className="text-2xl font-black text-foreground leading-tight">{verificationResult.student_name}</h4>
+                                                                    <p className="text-muted-foreground text-sm mt-1">Official Graduate • SnagUp Technologies</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-3 bg-muted/30 p-6 rounded-2xl border border-border/50">
+                                                                <div className="flex justify-between py-1 border-b border-border/40 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Certificate ID</span>
+                                                                    <span className="font-mono font-bold text-primary">{verificationResult.cert_id}</span>
+                                                                </div>
+                                                                <div className="flex justify-between py-1 border-b border-border/40 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Course Program</span>
+                                                                    <span className="font-bold text-foreground">{verificationResult.course_name}</span>
+                                                                </div>
+                                                                <div className="flex justify-between py-1 border-b border-border/40 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Course Duration</span>
+                                                                    <span className="font-bold text-foreground">{verificationResult.duration_days} Days</span>
+                                                                </div>
+                                                                <div className="flex justify-between py-1 border-b border-border/40 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Enrollment Date</span>
+                                                                    <span className="font-bold text-foreground">{verificationResult.enrollment_date}</span>
+                                                                </div>
+                                                                <div className="flex justify-between py-1 border-b border-border/40 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Completion Date</span>
+                                                                    <span className="font-bold text-foreground">{verificationResult.completion_date}</span>
+                                                                </div>
+                                                                <div className="flex justify-between py-1 text-xs">
+                                                                    <span className="text-muted-foreground font-bold uppercase">Status</span>
+                                                                    <span className="font-black text-emerald-500 uppercase tracking-wider">VALID / ISSUED</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-wrap gap-4 pt-4 border-t border-border/50 justify-end">
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(`${window.location.origin}/home?id=${verificationResult.cert_id}#verify`);
+                                                                    alert("Verification link copied to clipboard!");
+                                                                }}
+                                                                className="px-6 py-3 bg-muted hover:bg-muted/80 text-foreground text-xs font-bold rounded-xl transition-all flex items-center gap-2 border border-border"
+                                                            >
+                                                                Copy Verification Link
+                                                            </button>
+                                                            <a
+                                                                href={`${API_ENDPOINTS.CERTIFICATES.replace(/\/api\/certificates$/, '')}/certs/${verificationResult.cert_id}.pdf`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="px-6 py-3 bg-primary text-primary-foreground text-xs font-bold rounded-xl transition-all hover:opacity-90 flex items-center gap-2"
+                                                            >
+                                                                View Certificate PDF
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         )}
 
@@ -1236,8 +1292,11 @@ export default function HomePage() {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 className="mt-8 p-6 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex items-center gap-4 text-rose-500"
                                             >
-                                                <Shield className="w-5 h-5 shrink-0" />
-                                                <p className="text-sm font-bold">{verificationError}</p>
+                                                <Shield className="w-6 h-6 shrink-0" />
+                                                <div>
+                                                    <h5 className="font-black text-sm uppercase">Certificate Not Found</h5>
+                                                    <p className="text-xs mt-1 text-muted-foreground">{verificationError}</p>
+                                                </div>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>

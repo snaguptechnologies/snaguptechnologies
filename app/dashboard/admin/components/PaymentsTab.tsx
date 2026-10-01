@@ -19,6 +19,44 @@ interface PaymentsTabProps {
     handleBulkEnrollmentAction: (status: 'approved' | 'rejected') => void;
 }
 
+const renderPaymentBadge = (p: any) => {
+    const hasPayment = p.payment_id != null || (p.payment_status != null && p.payment_status !== '');
+    if (!hasPayment) {
+        return (
+            <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-muted/40 text-muted-foreground/60 border border-border/20">
+                No Payment
+            </span>
+        );
+    }
+    const status = String(p.payment_status || '').toLowerCase();
+    if (status === 'completed' || status === 'approved') {
+        return (
+            <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                Completed
+            </span>
+        );
+    }
+    if (status === 'pending') {
+        return (
+            <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                Pending
+            </span>
+        );
+    }
+    if (status === 'failed' || status === 'rejected' || status === 'refunded') {
+        return (
+            <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                {status}
+            </span>
+        );
+    }
+    return (
+        <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-muted/40 text-muted-foreground/60 border border-border/20">
+            No Payment
+        </span>
+    );
+};
+
 const PaymentsTab: React.FC<PaymentsTabProps> = ({
     paymentTab,
     setPaymentTab,
@@ -122,7 +160,6 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                                 <th className="pb-4 pr-4">Student Details</th>
                                 <th className="pb-4 px-4">Program & Cohort</th>
                                 <th className="pb-4 px-4">UTR Identity</th>
-                                <th className="pb-4 px-4">Amount Paid</th>
                                 <th className="pb-4 px-4">{paymentTab === 'pending' ? 'Submission Date' : 'Processed On'}</th>
                                 {paymentTab === 'history' && <th className="pb-4 px-4">Resolution Note</th>}
                                 <th className="pb-4 px-4 text-right">Status Control</th>
@@ -158,23 +195,9 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                                     </td>
                                     <td className="py-5 px-4">
                                         <div className="font-mono text-[11px] text-muted-foreground/60 tracking-tighter uppercase group-hover:text-foreground/70 transition-colors">{p.latest_transaction_id || p.transaction_id || 'N/A'}</div>
-                                    </td>
-                                    <td className="py-5 px-4">
-                                        {p.paid_amount != null ? (
-                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black tracking-tight border ${
-                                                p.enrollment_status === 'pending'
-                                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                                    : 'bg-muted/40 text-foreground border-border/30'
-                                            }`}>
-                                                ₹{Number(p.paid_amount).toLocaleString('en-IN')}
-                                            </span>
-                                        ) : p.batch_price != null ? (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black tracking-tight border bg-muted/30 text-muted-foreground border-border/20">
-                                                ₹{Number(p.batch_price).toLocaleString('en-IN')}
-                                            </span>
-                                        ) : (
-                                            <span className="text-[9px] text-muted-foreground/30 uppercase font-black">—</span>
-                                        )}
+                                        <div className="mt-1">
+                                            {renderPaymentBadge(p)}
+                                        </div>
                                     </td>
                                     <td className="py-5 px-4 text-[9px] font-black text-muted-foreground uppercase opacity-50 leading-tight tracking-widest">
                                         {new Date(paymentTab === 'pending' ? p.enrolled_at : p.updated_at || p.enrolled_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}<br />
@@ -216,7 +239,7 @@ const PaymentsTab: React.FC<PaymentsTabProps> = ({
                                 </tr>
                             ))}
                             {(filteredPayments || []).length === 0 && (
-                                <tr><td colSpan={paymentTab === 'history' ? 7 : (paymentTab === 'pending' ? 8 : 7)} className="py-32 text-center text-muted-foreground italic font-black uppercase tracking-widest opacity-20">No matching records found in {paymentTab}</td></tr>
+                                <tr><td colSpan={paymentTab === 'history' ? 6 : (paymentTab === 'pending' ? 7 : 6)} className="py-32 text-center text-muted-foreground italic font-black uppercase tracking-widest opacity-20">No matching records found in {paymentTab}</td></tr>
                             )}
                         </tbody>
                     </table>

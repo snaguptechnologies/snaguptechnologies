@@ -59,23 +59,6 @@ const triggerWaitlistNotifications = async (batchId) => {
 // GET /api/batches - public: shows all upcoming/active batches; admin uses ?all=true for archived too
 router.get('/', async (req, res) => {
   const showAll = req.query.all === 'true';
-  const now = nowIST();
-
-  // Auto-close expired enrollments
-  try {
-    const [info] = await db.execute(`
-      UPDATE batches 
-      SET enrollment_status = 'closed' 
-      WHERE enrollment_status = 'open' 
-        AND enrollment_end_date IS NOT NULL 
-        AND enrollment_end_date <= ?
-    `, [now]);
-    if (info.affectedRows > 0) {
-      console.log(`[SYSTEM] Auto-closed ${info.affectedRows} expired batch enrollments at ${now}`);
-    }
-  } catch(err) {
-    console.error('[SYSTEM] Error auto-closing expired enrollments:', err);
-  }
 
   let query = `
     SELECT b.*, c.name as course_name, u.name as instructor_name,
@@ -104,7 +87,6 @@ router.get('/', async (req, res) => {
 router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
   let { course_id, instructor_id, duration_days, price, enrollment_end_date } = req.body;
   if (!course_id) return res.status(400).json({ error: 'Missing course_id' });
-  if (!enrollment_end_date) return res.status(400).json({ error: 'Enrollment deadline is mandatory' });
 
   try {
     const [existingRows] = await db.execute(`
@@ -133,7 +115,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     const [result] = await db.execute(`
       INSERT INTO batches(name, course_id, instructor_id, duration_days, price, enrollment_status, batch_status, start_date, enrollment_end_date, is_finalized)
       VALUES(?, ?, ?, ?, ?, 'closed', 'upcoming', NULL, ?, 0)
-    `, [batchName, course_id, instructor_id || null, duration_days || 30, price || 0, enrollment_end_date]);
+    `, [batchName, course_id, instructor_id || null, duration_days || 30, price || 0, enrollment_end_date || null]);
 
     res.status(201).json({ id: result.insertId, message: 'Batch created successfully', name: batchName });
   } catch (err) {
@@ -731,6 +713,10 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
       }
     }
 
+    const [settingRows] = await db.execute('SELECT `value` FROM settings WHERE `key` = "min_attendance_pct"');
+    const minAttendanceSetting = settingRows.length > 0 ? parseFloat(settingRows[0].value) : 75;
+    const minAttendanceThreshold = isNaN(minAttendanceSetting) ? 75 : minAttendanceSetting;
+
     res.json({
       ...batch,
       last_read_guideline_at: enrollment.last_read_guideline_at,
@@ -739,7 +725,7 @@ router.get('/:id/workspace', authenticateToken, requireRole('student'), async (r
         totalClasses,
         attendedClasses,
         percentage: parseFloat(percentage),
-        eligibleForCertificate: (parseFloat(percentage) >= 80) && assessmentsPassed
+        eligibleForCertificate: (parseFloat(percentage) >= minAttendanceThreshold) && assessmentsPassed
       }
     });
 

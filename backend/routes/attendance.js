@@ -131,11 +131,15 @@ router.get('/student/:student_id/batch/:batch_id/stats', authenticateToken, asyn
             }
         }
 
+        const [settingRows] = await db.execute('SELECT `value` FROM settings WHERE `key` = "min_attendance_pct"');
+        const minAttendanceSetting = settingRows.length > 0 ? parseFloat(settingRows[0].value) : 75;
+        const minAttendanceThreshold = isNaN(minAttendanceSetting) ? 75 : minAttendanceSetting;
+
         res.json({
             totalClasses,
             attendedClasses,
             percentage: parseFloat(percentage),
-            eligibleForCertificate: (parseFloat(percentage) >= 80) && assessmentsPassed
+            eligibleForCertificate: (parseFloat(percentage) >= minAttendanceThreshold) && assessmentsPassed
         });
     } catch (err) {
         console.error(err);

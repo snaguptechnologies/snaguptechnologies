@@ -18,11 +18,11 @@ function PaymentPageContent() {
     const [batch, setBatch] = useState<{ id: number; name: string; price: number } | null>(null);
 
     useEffect(() => {
-        if (batchId && price) {
+        if (batchId) {
             setBatch({
                 id: parseInt(batchId, 10),
                 name: batchName || "Batch Enrollment",
-                price: parseFloat(price) || 0
+                price: price ? parseFloat(price) : 0
             });
         } else {
             router.replace("/dashboard/student");

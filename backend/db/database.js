@@ -23,9 +23,14 @@ const dbConfig = {
 
 const dbName = process.env.DB_NAME || 'snagup';
 
-// Initial pool is created WITH the database name for simplicity in routes,
-// but we'll try to ensure the DB exists first.
-let pool = mysql.createPool({ ...dbConfig, database: dbName });
+let pool = null;
+
+function initPool() {
+  if (!pool) {
+    pool = mysql.createPool({ ...dbConfig, database: dbName });
+  }
+  return pool;
+}
 
 async function ensureDatabaseExists() {
     let connection;
@@ -48,12 +53,13 @@ async function ensureDatabaseExists() {
         console.error("   Details:", err.message);
         console.error("   Check if your MySQL server is running on port:", dbConfig.port);
         console.error("   Current Configuration:", { host: dbConfig.host, user: dbConfig.user, port: dbConfig.port });
-        // Removed process.exit(1) to prevent the entire server from crashing
+        throw err;
     }
 }
 
 async function initializeTables() {
   try {
+    initPool();
     const connection = await pool.getConnection();
     const tables = [
       `CREATE TABLE IF NOT EXISTS users (
@@ -419,10 +425,10 @@ async function initializeTables() {
       }
     }
 
-    // Seed all 17 courses & default batches
+    // Seed all 22 courses & default batches
     const targetCourses = [
       { name: 'Frontend Development', category: 'Software Development', description: 'Modern HTML5, CSS3, JavaScript ES6+, React & Responsive UI Design' },
-      { name: 'Advanced Python Programming', category: 'Software Development', description: 'Object-Oriented Architecture, Metaprogramming, Async Workflows & System Design' },
+      { name: 'Python Builders', category: 'Software Development', description: 'Object-Oriented Architecture, Metaprogramming, Async Workflows & System Design' },
       { name: 'Java Programming', category: 'Software Development', description: 'Comprehensive Object-Oriented Java Programming & Enterprise Apps' },
       { name: 'C Programming', category: 'Software Development', description: 'Core C Programming Foundations, Memory Management & Data Structures' },
       { name: 'C++ Programming', category: 'Software Development', description: 'Modern C++17/20, STL Optimization, Templates & High Performance Code' },
@@ -493,6 +499,7 @@ async function initializeTables() {
     connection.release();
   } catch (err) {
     console.error("❌ Error initializing MySQL schema:", err.message);
+    throw err;
   }
 }
 
@@ -501,8 +508,24 @@ async function initializeDatabase() {
     await initializeTables();
 }
 
-const dbReady = initializeDatabase();
-pool.dbReady = dbReady;
-pool.initializeDatabase = initializeDatabase;
+const db = {
+  execute: async (...args) => {
+    if (!pool) initPool();
+    return pool.execute(...args);
+  },
+  query: async (...args) => {
+    if (!pool) initPool();
+    return pool.query(...args);
+  },
+  getConnection: async () => {
+    if (!pool) initPool();
+    return pool.getConnection();
+  },
+  initializeDatabase,
+  dbReady: null
+};
 
-module.exports = pool;
+db.dbReady = initializeDatabase();
+
+module.exports = db;
+

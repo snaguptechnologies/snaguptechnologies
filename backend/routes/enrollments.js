@@ -46,10 +46,13 @@ router.post('/', authenticateToken, requireRole('student'), async (req, res) => 
         );
         const enrollmentId = enrollmentResult.insertId;
 
+        const paymentAmount = batch.price != null ? batch.price : 0;
+        const pMethod = payment_method || 'upi';
+
         await connection.execute(`
             INSERT INTO payments (enrollment_id, student_id, amount, payment_method, transaction_id, status)
-            VALUES (?, ?, 0, 'direct', ?, 'completed')
-        `, [enrollmentId, student_id, txId]);
+            VALUES (?, ?, ?, ?, ?, 'pending')
+        `, [enrollmentId, student_id, paymentAmount, pMethod, txId]);
 
         await connection.commit();
         
@@ -59,7 +62,7 @@ router.post('/', authenticateToken, requireRole('student'), async (req, res) => 
             transaction_id
         ).catch(console.error);
 
-        res.status(201).json({ id: enrollmentId, message: 'Payment submitted for verification. You will be notified once approved.' });
+        res.status(201).json({ id: enrollmentId, message: 'Enrollment submitted for verification. You will be notified once approved.' });
     } catch (err) {
         if (connection) await connection.rollback();
         if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'Already enrolled (or payment pending) for this batch' });
@@ -82,13 +85,29 @@ router.post('/admin', authenticateToken, requireRole('admin'), async (req, res) 
 
     let connection;
     try {
-        // Find default cohort for this course
-        const [batches] = await db.execute(`SELECT id FROM batches WHERE course_id = ? ORDER BY id ASC LIMIT 1`, [course_id]);
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // Find eligible batch for this course
+        const [batches] = await connection.execute(
+            `SELECT id FROM batches WHERE course_id = ? AND batch_status NOT IN ('closed', 'completed') AND is_finalized = 0 ORDER BY id ASC LIMIT 1`,
+            [course_id]
+        );
         let batchId;
         if (batches.length === 0) {
-            const [courseRows] = await db.execute(`SELECT name FROM courses WHERE id = ?`, [course_id]);
+            const [allBatches] = await connection.execute(
+                `SELECT COUNT(*) as total FROM batches WHERE course_id = ?`,
+                [course_id]
+            );
+            if (allBatches[0].total > 0) {
+                await connection.rollback();
+                return res.status(400).json({
+                    error: 'No eligible batch available for this course. Existing batches are closed, completed, or finalized.'
+                });
+            }
+            const [courseRows] = await connection.execute(`SELECT name FROM courses WHERE id = ?`, [course_id]);
             const courseName = courseRows[0]?.name || 'Course';
-            const [newBatch] = await db.execute(`
+            const [newBatch] = await connection.execute(`
                 INSERT INTO batches (course_id, name, batch_status, enrollment_status, duration_days, price)
                 VALUES (?, ?, 'active', 'open', 0, 0)
             `, [course_id, `${courseName} - Default Cohort`]);
@@ -96,9 +115,6 @@ router.post('/admin', authenticateToken, requireRole('admin'), async (req, res) 
         } else {
             batchId = batches[0].id;
         }
-
-        connection = await db.getConnection();
-        await connection.beginTransaction();
 
         // Check if student is already enrolled in this course
         const [existingEnrollments] = await connection.execute(
@@ -111,18 +127,11 @@ router.post('/admin', authenticateToken, requireRole('admin'), async (req, res) 
             return res.status(400).json({ error: 'Student is already enrolled in this course.' });
         }
 
-        const txId = `ADMIN-ENR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
         const [enrollmentResult] = await connection.execute(
             `INSERT INTO enrollments (student_id, batch_id, status) VALUES (?, ?, 'approved')`,
             [student_id, batchId]
         );
         const enrollmentId = enrollmentResult.insertId;
-
-        await connection.execute(`
-            INSERT INTO payments (enrollment_id, student_id, amount, payment_method, transaction_id, status)
-            VALUES (?, ?, 0, 'admin_direct', ?, 'completed')
-        `, [enrollmentId, student_id, txId]);
 
         await connection.commit();
 

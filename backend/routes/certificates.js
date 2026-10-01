@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { notifyCertificateIssued } = require('../lib/emailService');
+const { getSupabaseClient } = require('../lib/jwtConfig');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 const fs = require('fs');
@@ -55,11 +56,21 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
   const presentCount = details.present_count || 0;
   const studentPct = Math.min(100, Math.round((presentCount / duration) * 100));
 
-  // Automatic eligibility requirement: Progress >= 80%
-  if (!is_admin_override && studentPct < 80) {
+  // Company settings & attendance threshold check
+  const [settingsRows] = await db.execute('SELECT `key`, `value` FROM settings');
+  const getSetting = (key, fallback = '') => {
+    const s = settingsRows.find(row => row.key === key);
+    return s ? s.value : fallback;
+  };
+
+  const minAttendanceSetting = parseFloat(getSetting('min_attendance_pct', '75'));
+  const minAttendanceThreshold = isNaN(minAttendanceSetting) ? 75 : minAttendanceSetting;
+
+  // Automatic eligibility requirement: Progress >= minAttendanceThreshold
+  if (!is_admin_override && studentPct < minAttendanceThreshold) {
     return { 
       success: false, 
-      error: `Student progress (${studentPct}%) is below the required 80% threshold for automatic certificate generation.` 
+      error: `Student progress (${studentPct}%) is below the required ${minAttendanceThreshold}% threshold for automatic certificate generation.` 
     };
   }
 
@@ -88,13 +99,6 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
     }
   }
 
-  // Company settings
-  const [settingsRows] = await db.execute('SELECT \`key\`, \`value\` FROM settings');
-  const getSetting = (key, fallback = '') => {
-    const s = settingsRows.find(row => row.key === key);
-    return s ? s.value : fallback;
-  };
-
   const siteName = getSetting('site_name', 'SnagUp Technologies');
   const siteUrlSetting = process.env.FRONTEND_URL || getSetting('site_url', 'http://localhost:3000');
 
@@ -112,25 +116,36 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
   const verificationBase = siteUrlSetting.startsWith('http') ? siteUrlSetting : `https://${siteUrlSetting}`;
   const verificationUrl = `${verificationBase.replace(/\/$/, '')}/home?id=${cert_id}#verify`;
 
-  const certDir = path.join(__dirname, '../certs');
-  if (!fs.existsSync(certDir)) fs.mkdirSync(certDir, { recursive: true });
-  const pdfPath = path.join(certDir, `${cert_id}.pdf`);
-
   // Generate QR code for certificate verification
   const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
-    margin: 1, color: { dark: '#1e1b4b', light: '#ffffff' }
+    margin: 1, color: { dark: '#0f2942', light: '#ffffff' }
   });
   const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-  const issuedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Dates: Enrollment Date & Completion Date (30 Days After Enrollment)
+  const [enrollmentRows] = await db.execute(
+    `SELECT enrolled_at as created_at FROM enrollments WHERE student_id = ? AND batch_id = ? LIMIT 1`,
+    [student_id, batch_id]
+  );
+  const rawEnrollmentDate = enrollmentRows[0]?.created_at ? new Date(enrollmentRows[0].created_at) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rawCompletionDate = new Date(rawEnrollmentDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  // ── PDF Creation ─────────────────────────────────────────────────────────────
+  const formatDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const enrollmentDateStr = formatDate(rawEnrollmentDate);
+  const completionDateStr = formatDate(rawCompletionDate);
+  const issuedDate = formatDate(new Date());
+
+  // ── PDF Creation matching input_file_0.png Master Reference ──────────────────
   const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 0 });
-  const stream = fs.createWriteStream(pdfPath);
-  doc.pipe(stream);
+  const pdfBufferPromise = new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
 
-  const W = doc.page.width;   // ~841
-  const H = doc.page.height;  // ~595
+  const W = doc.page.width;   // ~841.89
+  const H = doc.page.height;  // ~595.28
 
   const formatName = (str) => str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   const formattedStudentName = formatName(details.student_name);
@@ -138,180 +153,243 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
   // Background
   doc.rect(0, 0, W, H).fill('#ffffff');
 
-  // Outer Thick Border & Inner Gold Border
-  const borderMargin = 20;
-  const goldenYellow = '#FFB800';
+  // Geometric Corner Accents (Matching SnagUp Brand Geometry)
+  // Top-Left Blue Geometric Accent
+  doc.save();
+  doc.polygon([0, 0], [140, 0], [0, 140]).fill('#0284c7');
+  doc.polygon([0, 0], [110, 0], [0, 110]).fill('#0369a1');
+  doc.polygon([0, 0], [75, 0], [0, 75]).fill('#0f2942');
+  doc.restore();
 
-  doc.rect(borderMargin, borderMargin, W - borderMargin * 2, H - borderMargin * 2)
-     .lineWidth(8)
-     .strokeColor('#0f172a')
-     .stroke();
+  // Bottom-Right Blue Geometric Accent
+  doc.save();
+  doc.polygon([W, H], [W - 140, H], [W, H - 140]).fill('#0284c7');
+  doc.polygon([W, H], [W - 110, H], [W, H - 110]).fill('#0369a1');
+  doc.polygon([W, H], [W - 75, H], [W, H - 75]).fill('#0f2942');
+  doc.restore();
 
-  const innerMargin = borderMargin + 10;
-  doc.rect(innerMargin, innerMargin, W - innerMargin * 2, H - innerMargin * 2)
+  // Outer & Inner Borders
+  const bMargin = 16;
+  doc.rect(bMargin, bMargin, W - bMargin * 2, H - bMargin * 2)
      .lineWidth(2)
-     .strokeColor(goldenYellow)
+     .strokeColor('#0f2942')
      .stroke();
 
-  // Branding Logo
+  const iMargin = bMargin + 6;
+  doc.rect(iMargin, iMargin, W - iMargin * 2, H - iMargin * 2)
+     .lineWidth(1)
+     .strokeColor('#0284c7')
+     .stroke();
+
+  // ── HEADER AREA ─────────────────────────────────────────────────────────────
+  // Top-Left Branding Logo & Title
   const logoPath = path.join(__dirname, '../../public/brand-logo-v2.png');
-  const logoW = 80;
   if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, (W - logoW) / 2, 45, { width: logoW });
+    doc.image(logoPath, 50, 32, { width: 52 });
   }
 
-  doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold')
-    .text(siteName.toUpperCase(), 0, 130, { width: W, align: 'center', characterSpacing: 2 });
+  doc.fillColor('#0f2942').fontSize(20).font('Helvetica-Bold')
+    .text('SnagUp', 110, 32);
+  doc.fillColor('#0f2942').fontSize(7.5).font('Helvetica-Bold')
+    .text('TECHNOLOGIES', 110, 54, { characterSpacing: 1.5 });
 
-  // Main Titles
-  doc.fillColor('#64748b').fontSize(11).font('Helvetica-Bold')
-    .text('CERTIFICATE OF ACHIEVEMENT', 0, 180, { width: W, align: 'center', characterSpacing: 4 });
+  // Divider Line
+  doc.moveTo(215, 34).lineTo(215, 62).lineWidth(1).strokeColor('#cbd5e1').stroke();
 
-  doc.fillColor('#0f172a').fontSize(38).font('Times-Bold')
-    .text('COURSE COMPLETION', 0, 205, { width: W, align: 'center', characterSpacing: 1 });
+  // Subtitle
+  doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+    .text('Student Skill\nDevelopment Platform', 225, 36);
 
-  // Presentation text
-  doc.fillColor('#475569').fontSize(12).font('Helvetica')
-    .text('This certificate is proudly presented to', 0, 275, { width: W, align: 'center' });
+  // Top-Right Slogan
+  doc.fillColor('#1e40af').fontSize(8.5).font('Helvetica-Bold')
+    .text('LEARN   /   BUILD   /   GROW', W - 280, 40, { width: 230, align: 'right', characterSpacing: 1.5 });
 
-  // Student Name
-  doc.fillColor(goldenYellow).fontSize(50).font('Times-BoldItalic')
-    .text(formattedStudentName, 0, 300, { width: W, align: 'center' });
+  // Top-Right Blue Ribbon Seal Badge
+  const sealX = W - 90;
+  const sealY = 95;
+  const sealR = 34;
 
-  // Subtle separator line below name
-  doc.moveTo(W / 2 - 120, 365).lineTo(W / 2 + 120, 365).lineWidth(1).strokeColor(goldenYellow).opacity(0.5).stroke().opacity(1);
-
-  // Wording: Standard compliant wording suitable for >=80% threshold
-  doc.fillColor('#475569').fontSize(12).font('Helvetica')
-    .text('for successfully meeting the required learning criteria in', 0, 390, { width: W, align: 'center' });
-
-  doc.fillColor('#0f172a').fontSize(24).font('Helvetica-Bold')
-    .text(details.course_name.toUpperCase(), 0, 418, { width: W, align: 'center' });
-
-  doc.fillColor('#64748b').fontSize(10).font('Helvetica-Oblique')
-    .text('The learner achieved the required learning progress threshold.', 0, 460, { width: W, align: 'center' });
-
-  doc.fillColor('#475569').fontSize(11).font('Helvetica')
-    .text(`Date of Achievement: ${issuedDate}`, 0, 485, { width: W, align: 'center' });
-
-  // Footer / Seal & QR Code
-  const footerY = 510;
-  const sealX = 130;
-  const sealR = 42;
-
-  const numPoints = 72;
-  const outerR = sealR;
-  const innerR = sealR - 3;
-  const deepGold = '#B18B21';
-  const midGold  = '#D4AF37';
-  const lightGold = '#F9E27D';
-
+  // Ribbon Tails
   doc.save();
-
-  const sealGrad = doc.linearGradient(sealX - sealR, footerY - sealR, sealX + sealR, footerY + sealR);
-  sealGrad.stop(0, deepGold).stop(0.2, lightGold).stop(0.5, midGold).stop(0.8, lightGold).stop(1, deepGold);
-
-  doc.moveTo(sealX + outerR, footerY);
-  for (let i = 1; i <= numPoints * 2; i++) {
-    const angle = (i * Math.PI) / numPoints;
-    const r = i % 2 === 0 ? outerR : innerR;
-    doc.lineTo(sealX + Math.cos(angle) * r, footerY + Math.sin(angle) * r);
-  }
-  doc.closePath().fill(sealGrad);
-  doc.strokeColor(deepGold).lineWidth(0.5).stroke();
-
-  doc.circle(sealX, footerY, sealR - 6).lineWidth(1.5).strokeColor(lightGold).opacity(0.8).stroke();
-  doc.circle(sealX, footerY, sealR - 8).lineWidth(0.5).strokeColor(deepGold).opacity(0.4).stroke();
-  doc.circle(sealX, footerY, sealR - 12).lineWidth(1.2).strokeColor(lightGold).opacity(0.6).stroke();
-  doc.opacity(1);
-
-  const drawCurvedText = (text, radius, centerAngle, isReversed = false) => {
-    doc.save()
-       .translate(sealX, footerY)
-       .font('Helvetica-Bold')
-       .fontSize(5)
-       .fillColor(deepGold);
-
-    const charSpacing = 1.8; 
-    let totalWidth = 0;
-    for (let char of text) {
-      totalWidth += doc.widthOfString(char) + charSpacing;
-    }
-    const totalAngle = totalWidth / radius;
-    let currentAngle = isReversed ? (centerAngle + totalAngle / 2) : (centerAngle - totalAngle / 2);
-
-    for (let char of text) {
-      const charWidth = doc.widthOfString(char);
-      const charAngle = charWidth / radius;
-      const spacingAngle = charSpacing / radius;
-      const midAngle = isReversed ? (currentAngle - charAngle / 2) : (currentAngle + charAngle / 2);
-
-      doc.save();
-      doc.rotate(midAngle * (180 / Math.PI));
-      if (isReversed) {
-        doc.rotate(180);
-        doc.text(char, -charWidth / 2, radius - 2); 
-      } else {
-        doc.text(char, -charWidth / 2, -radius);
-      }
-      doc.restore();
-      currentAngle += isReversed ? -(charAngle + spacingAngle) : (charAngle + spacingAngle);
-    }
-    doc.restore();
-  };
-
-  drawCurvedText('OFFICIALLY VERIFIED', sealR - 11, -Math.PI / 2);
-  drawCurvedText('SNAGUP TECHNOLOGIES', sealR - 11, Math.PI / 2, true);
-
-  const starR = 9;
-  doc.save();
-  doc.translate(sealX, footerY);
-  doc.moveTo(0, -starR);
-  for (let i = 0; i < 5; i++) {
-    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-    doc.lineTo(Math.cos(angle + (4 * Math.PI / 5)) * starR, Math.sin(angle + (4 * Math.PI / 5)) * starR);
-  }
-  doc.closePath().fill(deepGold);
-  doc.restore();
+  doc.polygon([sealX - 18, sealY + 20], [sealX - 28, sealY + 65], [sealX - 18, sealY + 55], [sealX - 8, sealY + 65]).fill('#1d4ed8');
+  doc.polygon([sealX + 18, sealY + 20], [sealX + 8, sealY + 65], [sealX + 18, sealY + 55], [sealX + 28, sealY + 65]).fill('#1e40af');
   doc.restore();
 
-  // QR Code & Cert ID on Bottom Right
-  const qrSize = 65;
-  const sideMargin = 70;
-  const rightX = W - sideMargin - qrSize;
+  // Outer Seal Circle (Dark Blue)
+  doc.circle(sealX, sealY, sealR).fill('#0f2942');
+  doc.circle(sealX, sealY, sealR - 3).lineWidth(1.5).strokeColor('#0284c7').stroke();
+  doc.circle(sealX, sealY, sealR - 6).lineWidth(0.8).strokeColor('#ffffff').stroke();
 
-  doc.image(qrBuffer, rightX, footerY - 45, { width: qrSize });
-  doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold')
-    .text(`ID: ${cert_id}`, rightX - 35, footerY + 25, { width: qrSize + 70, align: 'center' });
+  // Seal Text Inside
+  doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+    .text('SNAG', sealX - 25, sealY - 18, { width: 50, align: 'center' });
+  doc.fillColor('#ffffff').fontSize(4).font('Helvetica-Bold')
+    .text('SNAGUP TECHNOLOGIES', sealX - 25, sealY + 2, { width: 50, align: 'center' });
+  doc.fillColor('#ffffff').fontSize(6).font('Helvetica')
+    .text('★ ★ ★', sealX - 25, sealY + 10, { width: 50, align: 'center' });
 
-  // Center Footer Verification Note
-  doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-    .text('Official Digital Credential • Verify online at SnagUp Technologies', 0, footerY + 45, { width: W, align: 'center' });
+  // ── CERTIFICATE TITLE & PRESENTATION ─────────────────────────────────────────
+  doc.fillColor('#0f2942').fontSize(26).font('Times-Bold')
+    .text('CERTIFICATE  OF  COMPLETION', 0, 118, { width: W, align: 'center', characterSpacing: 1 });
 
-  doc.end();
+  // Graduation Cap Vector Icon
+  const capX = W / 2;
+  const capY = 160;
+  doc.save();
+  doc.polygon([capX, capY - 8], [capX + 16, capY], [capX, capY + 8], [capX - 16, capY]).fill('#0f2942');
+  doc.rect(capX - 7, capY + 4, 14, 6).fill('#0f2942');
+  doc.restore();
 
-  await new Promise((resolve, reject) => {
-    stream.on('finish', resolve);
-    stream.on('error', reject);
+  // Line below title
+  doc.moveTo(W / 2 - 160, 178).lineTo(W / 2 + 160, 178).lineWidth(1).strokeColor('#0284c7').stroke();
+
+  // Presentation Text
+  doc.fillColor('#475569').fontSize(12).font('Helvetica')
+    .text('This certificate is proudly presented to', 0, 196, { width: W, align: 'center' });
+
+  // Student Name (Large Cursive / Serif Blue Font)
+  doc.fillColor('#1d4ed8').fontSize(42).font('Times-BoldItalic')
+    .text(formattedStudentName, 0, 222, { width: W, align: 'center' });
+
+  // Line below name
+  doc.moveTo(W / 2 - 180, 278).lineTo(W / 2 + 180, 278).lineWidth(1).strokeColor('#0284c7').opacity(0.7).stroke().opacity(1);
+
+  // Completion Wording
+  doc.fillColor('#475569').fontSize(11.5).font('Helvetica')
+    .text('for successfully completing the', 0, 292, { width: W, align: 'center' });
+
+  doc.fillColor('#0f2942').fontSize(22).font('Helvetica-Bold')
+    .text(details.course_name, 0, 312, { width: W, align: 'center' });
+
+  doc.fillColor('#475569').fontSize(10.5).font('Helvetica')
+    .text('learning program conducted by ', 0, 342, { width: W, align: 'center' });
+  doc.fillColor('#0f2942').fontSize(10.5).font('Helvetica-Bold')
+    .text('SnagUp Technologies.', 0, 342, { width: W, align: 'center' });
+
+  // ── BOTTOM METADATA CARDS (4 COLUMNS) ─────────────────────────────────────────
+  const cardY = 380;
+  const cardW = 150;
+  const cardH = 50;
+  const cardGap = 16;
+  const startX = (W - (cardW * 4 + cardGap * 3)) / 2;
+
+  const metadata = [
+    { label: 'COURSE DURATION', val: `${details.duration_days || 30} Days`, sub: null },
+    { label: 'ENROLLMENT DATE', val: enrollmentDateStr, sub: null },
+    { label: 'COMPLETION DATE', val: completionDateStr, sub: '(30 Days After Enrollment)' },
+    { label: 'CERTIFICATE ID', val: cert_id, sub: null }
+  ];
+
+  metadata.forEach((m, idx) => {
+    const cx = startX + idx * (cardW + cardGap);
+
+    // Border & Background
+    doc.rect(cx, cardY, cardW, cardH).lineWidth(0.8).strokeColor('#e2e8f0').fill('#f8fafc');
+
+    // Left Icon Placeholder Box
+    doc.rect(cx + 8, cardY + 9, 32, 32).lineWidth(0.8).strokeColor('#0284c7').fill('#f0f9ff');
+    doc.fillColor('#0284c7').fontSize(12).font('Helvetica-Bold')
+      .text('✓', cx + 8, cardY + 16, { width: 32, align: 'center' });
+
+    // Text Contents
+    doc.fillColor('#64748b').fontSize(6.5).font('Helvetica-Bold')
+      .text(m.label, cx + 46, cardY + 10, { width: cardW - 50 });
+
+    doc.fillColor('#0f2942').fontSize(9.5).font('Helvetica-Bold')
+      .text(m.val, cx + 46, cardY + 22, { width: cardW - 50 });
+
+    if (m.sub) {
+      doc.fillColor('#94a3b8').fontSize(5.5).font('Helvetica')
+        .text(m.sub, cx + 46, cardY + 35, { width: cardW - 50 });
+    }
   });
 
+  // ── FOOTER AREA ─────────────────────────────────────────────────────────────
+  const footerY = 465;
+
+  // Left: Authorized Signatory
+  // Signature Graphic Path
+  doc.save();
+  doc.moveTo(70, footerY + 20).bezierCurveTo(90, footerY, 110, footerY + 30, 130, footerY + 15).lineWidth(1.5).strokeColor('#0f2942').stroke();
+  doc.restore();
+
+  doc.fillColor('#0f2942').fontSize(10).font('Helvetica-Bold')
+    .text('Authorized Signatory', 60, footerY + 32);
+  doc.fillColor('#475569').fontSize(9).font('Helvetica')
+    .text('SnagUp Technologies', 60, footerY + 45);
+
+  // Center: Web Verification Domain
+  const cleanDomain = siteUrlSetting.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  doc.fillColor('#0f2942').fontSize(9).font('Helvetica-Bold')
+    .text(`🌐  ${cleanDomain}`, 0, footerY + 38, { width: W, align: 'center' });
+
+  // Right: QR Code & Verification Subtitle
+  const qrSize = 64;
+  const qrX = W - 145;
+  const qrY = footerY - 5;
+
+  doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+  doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
+    .text('Scan to verify\nthis certificate', qrX - 25, qrY + qrSize + 4, { width: qrSize + 50, align: 'center' });
+
+  doc.end();
+  const pdfBuffer = await pdfBufferPromise;
+
+  let storedPdfPath = '';
+  const supabase = getSupabaseClient();
+  const bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'snagup-files';
+
+  if (supabase) {
+    const storagePath = `certificates/${cert_id}.pdf`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('💥 Supabase Certificate Storage Upload Error:', uploadError);
+      return { 
+        success: false, 
+        error: `Failed to upload certificate PDF to cloud storage: ${uploadError.message}` 
+      };
+    }
+    storedPdfPath = storagePath;
+  } else {
+    // Local filesystem fallback if Supabase client is unconfigured
+    const certDir = path.join(__dirname, '../certs');
+    if (!fs.existsSync(certDir)) fs.mkdirSync(certDir, { recursive: true });
+    const localPdfPath = path.join(certDir, `${cert_id}.pdf`);
+    fs.writeFileSync(localPdfPath, pdfBuffer);
+    storedPdfPath = localPdfPath;
+  }
+
   const releaseType = is_admin_override ? 'ADMIN_OVERRIDE' : 'AUTOMATIC';
-  const certStatus = is_admin_override ? 'ADMIN_RELEASED' : 'GENERATED';
+  const certStatus = is_admin_override ? 'ISSUED' : 'ISSUED';
 
   await db.execute(`
     INSERT INTO certificates 
     (student_id, batch_id, cert_id, is_eligible, pdf_path, release_type, status, release_reason, released_by_admin_id, released_by_admin_name, progress_at_release) 
     VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE 
+      status = VALUES(status), 
+      pdf_path = VALUES(pdf_path),
+      release_type = VALUES(release_type),
+      release_reason = VALUES(release_reason),
+      released_by_admin_id = VALUES(released_by_admin_id),
+      released_by_admin_name = VALUES(released_by_admin_name),
+      issued_at = CURRENT_TIMESTAMP
   `, [
-    student_id, batch_id, cert_id, pdfPath, releaseType, certStatus, 
+    student_id, batch_id, cert_id, storedPdfPath, releaseType, certStatus, 
     release_reason, admin_id, admin_name, studentPct
   ]);
 
   try {
-    const actType = is_admin_override ? 'certificate_issued' : 'certificate_issued';
+    const actType = 'certificate_issued';
     const actDesc = is_admin_override 
-      ? `Certificate ID: ${cert_id} manually released by Admin for ${details.course_name}.`
-      : `Certificate ID: ${cert_id} automatically issued for ${details.course_name}.`;
+      ? `Certificate ID: ${cert_id} issued by Admin for ${details.course_name}.`
+      : `Certificate ID: ${cert_id} issued for ${details.course_name}.`;
 
     await db.execute(
       `INSERT INTO student_activities (student_id, title, description, activity_type) VALUES (?, ?, ?, ?)`,
@@ -325,7 +403,7 @@ async function generateCertificateInternal(student_id, batch_id, options = {}) {
     notifyCertificateIssued(details.student_email, details.student_name, details.batch_name, cert_id).catch(console.error);
   }
 
-  return { success: true, cert_id, pdf_path: pdfPath };
+  return { success: true, cert_id, pdf_path: storedPdfPath };
 }
 
 // ─── GET /api/certificates/verify/:cert_id — public ─────────────────────────
@@ -335,18 +413,52 @@ router.get('/verify/:cert_id', async (req, res) => {
       SELECT c.cert_id, c.issued_at, c.release_type, c.status,
         s.name as student_name,
         b.name as batch_name, b.duration_days,
-        co.name as course_name
+        e.created_at as enrollment_date,
+        co.name as course_name,
+        u.name as instructor_name
       FROM certificates c
       JOIN users s ON c.student_id = s.id
       JOIN batches b ON c.batch_id = b.id
       JOIN courses co ON b.course_id = co.id
+      LEFT JOIN users u ON b.instructor_id = u.id
+      LEFT JOIN enrollments e ON (e.student_id = c.student_id AND e.batch_id = c.batch_id)
       WHERE c.cert_id = ?
     `, [req.params.cert_id]);
 
     const cert = certRows[0];
 
-    if (!cert) return res.status(404).json({ error: 'Certificate not found or invalid' });
-    res.json({ valid: true, certificate: cert });
+    if (!cert) {
+      return res.status(404).json({ 
+        error: 'Certificate Not Found', 
+        message: 'The certificate ID could not be verified in the SnagUp certificate registry.' 
+      });
+    }
+
+    const isRevoked = cert.status === 'REVOKED';
+
+    const rawEnrDate = cert.enrollment_date ? new Date(cert.enrollment_date) : new Date(new Date(cert.issued_at).getTime() - 30 * 24 * 60 * 60 * 1000);
+    const rawCompDate = new Date(rawEnrDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const formatDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    res.json({ 
+      valid: !isRevoked, 
+      status: isRevoked ? 'REVOKED' : 'VALID',
+      message: isRevoked 
+        ? 'This certificate was previously issued but is no longer considered valid.' 
+        : 'Officially Verified Digital Credential issued by SnagUp Technologies.',
+      certificate: {
+        cert_id: cert.cert_id,
+        student_name: cert.student_name,
+        course_name: cert.course_name,
+        batch_name: cert.batch_name,
+        duration_days: cert.duration_days || 30,
+        enrollment_date: formatDate(rawEnrDate),
+        completion_date: formatDate(rawCompDate),
+        issued_at: formatDate(new Date(cert.issued_at)),
+        instructor_name: cert.instructor_name || 'SnagUp Academic Director',
+        status: isRevoked ? 'REVOKED' : 'VALID'
+      } 
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to verify certificate' });
@@ -361,29 +473,29 @@ router.post('/admin/release', authenticateToken, requireRole('admin'), async (re
     return res.status(400).json({ error: 'Missing student_id or batch_id' });
   }
 
-  if (!release_reason || typeof release_reason !== 'string' || !release_reason.trim()) {
-    return res.status(400).json({ error: 'A short reason is required for manual certificate release.' });
-  }
+  const reasonText = (typeof release_reason === 'string' && release_reason.trim()) 
+    ? release_reason.trim() 
+    : 'Admin Authorized Issuance';
 
   try {
     const result = await generateCertificateInternal(student_id, batch_id, {
       is_admin_override: true,
-      release_reason: release_reason.trim(),
+      release_reason: reasonText,
       admin_id: req.user.id,
       admin_name: req.user.name
     });
 
     if (!result.success) {
       if (result.error === 'Certificate already generated' && result.cert_id) {
-        return res.json({ message: 'Certificate already exists', cert_id: result.cert_id, exists: true });
+        return res.json({ message: 'Certificate already issued', cert_id: result.cert_id, exists: true });
       }
       return res.status(400).json({ error: result.error, cert_id: result.cert_id });
     }
 
-    res.json({ message: 'Certificate manually released by Admin', cert_id: result.cert_id, exists: false });
+    res.json({ message: 'Certificate officially issued by Admin', cert_id: result.cert_id, exists: false });
   } catch (err) {
     console.error('Admin Certificate Release Error:', err);
-    res.status(500).json({ error: 'Failed to manually release certificate' });
+    res.status(500).json({ error: 'Failed to issue certificate' });
   }
 });
 
@@ -400,18 +512,31 @@ router.post('/generate', authenticateToken, async (req, res) => {
   if (!student_id || !batch_id) return res.status(400).json({ error: 'Missing student_id or batch_id' });
 
   try {
+    // Check if certificate has been approved/issued by admin
+    const [certRows] = await db.execute(`SELECT * FROM certificates WHERE student_id = ? AND batch_id = ?`, [student_id, batch_id]);
+    const existingCert = certRows[0];
+
+    if (req.user.role === 'student') {
+      if (!existingCert || existingCert.status === 'PENDING') {
+        return res.status(403).json({ error: 'Certificate Pending Admin Approval. Download will be unlocked once approved by Admin.' });
+      }
+      if (existingCert.status === 'REVOKED') {
+        return res.status(403).json({ error: 'This certificate has been revoked.' });
+      }
+    }
+
     const result = await generateCertificateInternal(student_id, batch_id, {
-      is_admin_override: req.user.role === 'admin' ? false : false
+      is_admin_override: req.user.role === 'admin'
     });
 
     if (!result.success) {
       if (result.error === 'Certificate already generated' && result.cert_id) {
-        return res.json({ message: 'Certificate already exists', cert_id: result.cert_id, exists: true });
+        return res.json({ message: 'Certificate already issued', cert_id: result.cert_id, exists: true });
       }
       return res.status(400).json({ error: result.error, cert_id: result.cert_id });
     }
 
-    res.json({ message: 'Certificate generated', cert_id: result.cert_id, exists: false });
+    res.json({ message: 'Certificate generated successfully', cert_id: result.cert_id, exists: false });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to generate certificate' });
@@ -432,6 +557,10 @@ router.post('/regenerate', authenticateToken, async (req, res) => {
     
     if (!existing) return res.status(404).json({ error: 'No certificate found to regenerate' });
 
+    if (req.user.role === 'student' && existing.status === 'REVOKED') {
+      return res.status(403).json({ error: 'Cannot regenerate a revoked certificate.' });
+    }
+
     const originalCertId = existing.cert_id;
     const isOverride = existing.release_type === 'ADMIN_OVERRIDE';
     const reason = existing.release_reason;
@@ -442,8 +571,6 @@ router.post('/regenerate', authenticateToken, async (req, res) => {
     if (oldPdf && fs.existsSync(oldPdf)) {
       try { fs.unlinkSync(oldPdf); } catch (_) {}
     }
-
-    await db.execute(`DELETE FROM certificates WHERE student_id = ? AND batch_id = ?`, [student_id, batch_id]);
 
     const result = await generateCertificateInternal(student_id, batch_id, {
       custom_cert_id: originalCertId,
@@ -457,7 +584,7 @@ router.post('/regenerate', authenticateToken, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }
-    res.json({ message: 'Certificate regenerated', cert_id: result.cert_id });
+    res.json({ message: 'Certificate PDF regenerated', cert_id: result.cert_id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to regenerate certificate' });
@@ -487,19 +614,69 @@ router.get('/admin/all', authenticateToken, requireRole('admin'), async (req, re
   }
 });
 
-// ─── DELETE /api/certificates/admin/:id — admin only ─────────────────────────
+// ─── DELETE /api/certificates/admin/:id — admin revoke certificate ────────────
 router.delete('/admin/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
-    const [certRows] = await db.execute(`SELECT pdf_path FROM certificates WHERE id = ?`, [req.params.id]);
-    const cert = certRows[0];
-    if (cert && cert.pdf_path && fs.existsSync(cert.pdf_path)) {
-      try { fs.unlinkSync(cert.pdf_path); } catch (_) {}
-    }
-    await db.execute(`DELETE FROM certificates WHERE id = ?`, [req.params.id]);
-    res.json({ message: 'Certificate revoked and record deleted' });
+    // Revoke certificate by setting status='REVOKED' (Preserves record for verification url)
+    await db.execute(`UPDATE certificates SET status = 'REVOKED' WHERE id = ?`, [req.params.id]);
+    res.json({ message: 'Certificate officially revoked' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to delete certificate' });
+    res.status(500).json({ error: 'Failed to revoke certificate' });
+  }
+});
+
+// ─── GET /api/certificates/download/:cert_id ──────────────────────────────────
+router.get('/download/:cert_id', async (req, res) => {
+  try {
+    const certId = req.params.cert_id;
+    const [certRows] = await db.execute(
+      `SELECT * FROM certificates WHERE cert_id = ?`,
+      [certId]
+    );
+    const cert = certRows[0];
+
+    if (!cert) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+
+    if (cert.status === 'REVOKED') {
+      return res.status(403).json({ error: 'This certificate has been revoked' });
+    }
+
+    const storedPath = cert.pdf_path || `certificates/${cert.cert_id}.pdf`;
+
+    // If it's a Supabase storage relative path or if local file doesn't exist
+    if (storedPath.startsWith('certificates/') || !fs.existsSync(storedPath)) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'snagup-files';
+        const storagePath = storedPath.startsWith('certificates/')
+          ? storedPath
+          : `certificates/${cert.cert_id}.pdf`;
+
+        const { data, error } = await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(storagePath, 300);
+
+        if (error || !data?.signedUrl) {
+          console.error('Signed URL generation error:', error);
+          return res.status(500).json({ error: 'Failed to generate download link' });
+        }
+
+        return res.redirect(data.signedUrl);
+      }
+    }
+
+    // Local filesystem fallback for old legacy certificates
+    if (fs.existsSync(storedPath)) {
+      return res.sendFile(path.resolve(storedPath));
+    }
+
+    return res.status(404).json({ error: 'Certificate storage file missing' });
+  } catch (err) {
+    console.error('Certificate Download Error:', err);
+    res.status(500).json({ error: 'Failed to process certificate download' });
   }
 });
 

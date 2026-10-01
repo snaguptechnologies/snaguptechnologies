@@ -6,8 +6,7 @@ const db = require('../db/database');
 const { authenticateToken } = require('../middleware/auth');
 const { sendEmail } = require('../lib/emailService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'snagup_secret_2026';
-if (!process.env.JWT_SECRET) console.warn("⚠️ JWT_SECRET not found in environment, using default.");
+const { getJwtSecret } = require('../lib/jwtConfig');
 
 // --- Forgot Password Flow ---
 
@@ -121,31 +120,51 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-    console.log(`[Auth] Attempting login for: ${email}`);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`[Auth] Attempting login for: ${normalizedEmail}`);
+
     try {
-        const [rows] = await db.execute(`SELECT * FROM users WHERE email = ? AND is_active = 1`, [email.toLowerCase().trim()]);
+        // Step 1: Find user by normalized email
+        const [rows] = await db.execute(`SELECT * FROM users WHERE email = ?`, [normalizedEmail]);
         const user = rows[0];
         
+        // Step 2: User not found
         if (!user) {
-            console.warn(`[Auth] Login failed: User not found for ${email}`);
+            console.warn(`[Auth] Login failed: User not found for ${normalizedEmail}`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        // Step 3: Account inactive check
+        if (user.is_active === 0 || user.is_active === false || user.is_active === null || user.is_active === undefined) {
+            console.warn(`[Auth] Login rejected: Account deactivated for ${normalizedEmail} (ID: ${user.id})`);
+            return res.status(403).json({ error: 'Account is deactivated. Please contact support.' });
+        }
+
+        // Step 4: Password verification
         const valid = bcrypt.compareSync(password, user.password_hash);
         if (!valid) {
-            console.warn(`[Auth] Login failed: Password mismatch for ${email}`);
+            console.warn(`[Auth] Login failed: Password mismatch for ${normalizedEmail}`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
-        console.log(`[Auth] Login success: ${email} (${user.role})`);
+        // Step 5: JWT token creation
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, getJwtSecret(), { expiresIn: '7d' });
+        console.log(`[Auth] Login success: ${normalizedEmail} (${user.role})`);
+
+        // Step 6: Set HTTP-only cookie & return response
+        res.cookie('snagup_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
 
         res.json({
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone }
         });
     } catch (err) {
-        console.error("❌ [Auth] Fatal Login Error:", err);
+        console.error("❌ [Auth] Database / Server error during login:", err.message);
         res.status(500).json({ error: 'Login failed due to server error' });
     }
 });
@@ -166,8 +185,15 @@ router.post('/register', async (req, res) => {
         );
 
         const insertId = result.insertId;
-        const token = jwt.sign({ id: insertId, email: email.toLowerCase().trim(), role: 'student', name }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ id: insertId, email: email.toLowerCase().trim(), role: 'student', name }, getJwtSecret(), { expiresIn: '7d' });
         
+        res.cookie('snagup_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
         res.status(201).json({ token, user: { id: insertId, name, email: email.toLowerCase().trim(), role: 'student' } });
     } catch (err) {
         console.error(err);
@@ -177,12 +203,25 @@ router.post('/register', async (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', async (req, res) => {
+    let token = null;
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'No token' });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    } else if (req.headers.cookie) {
+        const cookieMap = {};
+        req.headers.cookie.split(';').forEach(cookieStr => {
+            const parts = cookieStr.trim().split('=');
+            if (parts.length >= 2) {
+                cookieMap[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('='));
+            }
+        });
+        token = cookieMap['snagup_token'];
+    }
+
+    if (!token) return res.status(401).json({ error: 'No token provided' });
     
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, getJwtSecret());
         const [rows] = await db.execute(`SELECT id, name, email, role, phone, is_active FROM users WHERE id = ?`, [decoded.id]);
         const user = rows[0];
         if (!user) return res.status(404).json({ error: 'User not found' });
@@ -190,6 +229,16 @@ router.get('/me', async (req, res) => {
     } catch (e) {
         res.status(403).json({ error: 'Invalid token' });
     }
+});
+
+// POST /api/auth/logout
+router.post('/logout', (req, res) => {
+    res.clearCookie('snagup_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+    res.json({ message: 'Logged out successfully' });
 });
 
 // PUT /api/auth/profile - update current user profile
