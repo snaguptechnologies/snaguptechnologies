@@ -1120,43 +1120,39 @@ function StudentDashboardContent() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                    {stats?.enrollments?.filter((e: any) => e.status === 'approved' && (e.batch_status === 'completed' || e.attendance_completed || stats?.certificates?.some((c: any) => c.batch_id === e.batch_id) || Math.min(Math.round(((e.attended_sessions || 0) / (e.duration_days || 1)) * 100), 100) >= 80 || e.cert_status === 'ADMIN_RELEASED' || e.release_type === 'ADMIN_OVERRIDE')).length > 0 ? 
-                                        stats.enrollments.filter((e: any) => e.status === 'approved' && (e.batch_status === 'completed' || e.attendance_completed || stats?.certificates?.some((c: any) => c.batch_id === e.batch_id) || Math.min(Math.round(((e.attended_sessions || 0) / (e.duration_days || 1)) * 100), 100) >= 80 || e.cert_status === 'ADMIN_RELEASED' || e.release_type === 'ADMIN_OVERRIDE')).map((enr: any) => {
-                                            const pct = Math.min(Math.round(((enr.attended_sessions || 0) / (enr.duration_days || 1)) * 100), 100);
+                                    {stats?.enrollments?.filter((e: any) => e.status === 'approved').length > 0 ? 
+                                        stats.enrollments.filter((e: any) => e.status === 'approved').map((enr: any) => {
                                             const cert = stats?.certificates?.find((c: any) => c.batch_id === enr.batch_id);
                                             const hasCert = !!cert;
-                                            const isUnlocked = hasCert || pct >= 80 || enr.cert_status === 'ADMIN_RELEASED' || enr.release_type === 'ADMIN_OVERRIDE';
-                                            const isArchived = !!enr.archived_at;
-                                            const isInstructorVerified = !!enr.instructor_verified;
-                                            const isAttendanceDone = !!enr.attendance_completed;
+                                            const isIssued = hasCert && cert.status !== 'REVOKED' && cert.status !== 'PENDING';
+                                            const isRevoked = hasCert && cert.status === 'REVOKED';
+                                            const isPending = !hasCert || cert.status === 'PENDING';
+
+                                            const verifyUrl = cert ? `${window.location.origin}/home?id=${cert.cert_id}#verify` : '';
 
                                             return (
                                                 <div key={enr.id} className="group relative glass-panel p-8 rounded-[2.5rem] border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5 hover:border-amber-500/40 transition-all duration-500 shadow-2xl shadow-amber-500/5 overflow-hidden flex flex-col min-h-[420px]">
-                                                    {/* Decorative Metallic Background Elements */}
-                                                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity" />
-                                                    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity" />
-
                                                     <div className="relative z-10 flex flex-col h-full">
-                                                        <div className="flex justify-between items-start mb-8">
+                                                        <div className="flex justify-between items-start mb-6">
                                                             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform duration-500">
                                                                 <Award className="w-7 h-7 text-amber-500" />
                                                             </div>
-                                                            {hasCert && (
+                                                            {isIssued && (
                                                                 <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-1.5">
                                                                     <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Record Verified</span>
+                                                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">ISSUED / VALID</span>
                                                                 </div>
                                                             )}
-                                                            {!hasCert && isInstructorVerified && !isArchived && (
-                                                                <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center gap-1.5 animate-pulse">
-                                                                    <Shield className="w-3 h-3 text-blue-500" />
-                                                                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Admin Sync Pending</span>
+                                                            {isRevoked && (
+                                                                <div className="px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-1.5">
+                                                                    <X className="w-3 h-3 text-rose-500" />
+                                                                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">REVOKED</span>
                                                                 </div>
                                                             )}
-                                                            {!hasCert && isAttendanceDone && !isInstructorVerified && (
+                                                            {isPending && (
                                                                 <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-1.5 animate-pulse">
                                                                     <Clock className="w-3 h-3 text-amber-500" />
-                                                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Instructor Review</span>
+                                                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">PENDING APPROVAL</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1169,64 +1165,69 @@ function StudentDashboardContent() {
                                                             </div>
                                                         </div>
 
-                                                        {hasCert ? (
-                                                            <div className="p-4 bg-black/20 rounded-2xl border border-white/5 mb-8">
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Credential ID</span>
+                                                        {isIssued ? (
+                                                            <div className="p-4 bg-black/20 rounded-2xl border border-white/5 mb-6 space-y-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Certificate ID</span>
                                                                     <Shield className="w-3 h-3 text-amber-500/40" />
                                                                 </div>
                                                                 <p className="text-xs font-mono font-bold text-amber-500/90 tracking-wider">
                                                                     {cert.cert_id}
                                                                 </p>
                                                             </div>
-                                                        ) : !isArchived ? (
-                                                            <div className="mt-2 p-5 bg-black/20 rounded-2xl border border-white/5 space-y-2 flex-grow">
-                                                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-2">
-                                                                    {isInstructorVerified ? 'Admin Final Verification' : 'Instructor Reviewing Records'}
-                                                                </p>
-                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                                                    {isInstructorVerified 
-                                                                        ? 'The instructor has verified your records. Your certificate will be published within 2 days. You will be notified once the certificate is available through your respective mail account.' 
-                                                                        : 'The instructor is verifying your records. Your certificate will be published within 2 days. You will be notified once the certificate is available through your respective mail account.'}
-                                                                </p>
+                                                        ) : isRevoked ? (
+                                                            <div className="mt-2 p-5 bg-rose-500/5 rounded-2xl border border-rose-500/20 flex-grow space-y-2">
+                                                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest border-b border-rose-500/10 pb-2">Certificate Revoked</p>
+                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">This certificate was previously issued but is no longer valid.</p>
                                                             </div>
                                                         ) : (
-                                                            <div className="mt-2 p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 flex-grow">
-                                                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest border-b border-emerald-500/10 pb-2 mb-2">Achievement Unlocked</p>
-                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">Manual verification complete. You can now claim your unique digital achievement record.</p>
+                                                            <div className="mt-2 p-5 bg-amber-500/5 rounded-2xl border border-amber-500/10 flex-grow space-y-2">
+                                                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest border-b border-amber-500/10 pb-2">Pending Admin Approval</p>
+                                                                <p className="text-[11px] leading-relaxed text-muted-foreground">Certificate download requires Admin approval. Once approved by Admin, your official PDF certificate and verification link will be unlocked here.</p>
                                                             </div>
                                                         )}
 
-                                                        <div className="mt-auto pt-6">
-                                                            {hasCert ? (
-                                                                <div className="flex gap-3">
-                                                                    <a 
-                                                                        href={`${BACKEND_URL}/certs/${cert.cert_id}.pdf`} 
-                                                                        download={`${cert.cert_id}.pdf`} 
-                                                                        target="_blank" 
-                                                                        className="flex-1 py-4 bg-amber-500 hover:bg-amber-400 text-black text-center rounded-2xl text-[11px] font-black uppercase tracking-[0.1em] transition-all hover:shadow-lg hover:shadow-amber-500/20 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
-                                                                    >
-                                                                        <Download className="w-4 h-4" /> Download PDF
-                                                                    </a>
-                                                                    <button 
-                                                                        onClick={() => handleRegenerateCert(cert)} 
-                                                                        disabled={regeneratingCerts[cert.id]}
-                                                                        className="p-4 border border-amber-500/30 text-amber-500 hover:bg-amber-500/10 rounded-2xl transition-all hover:scale-105 active:scale-90 disabled:opacity-50"
-                                                                        title="Synchronize/Refresh Seal Text"
-                                                                    >
-                                                                        {regeneratingCerts[cert.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-                                                                    </button>
-                                                                </div>
-                                                            ) : isArchived ? (
-                                                                <button 
-                                                                    onClick={() => handleClaimCertificate(enr.batch_id)} 
-                                                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.1em] transition-all hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
-                                                                >
-                                                                    Claim Your Certificate <Award className="w-4 h-4" />
-                                                                </button>
+                                                        <div className="mt-auto pt-6 flex flex-col gap-2">
+                                                            {isIssued ? (
+                                                                <>
+                                                                    <div className="flex gap-2">
+                                                                        <a 
+                                                                            href={`${BACKEND_URL}/certs/${cert.cert_id}.pdf`} 
+                                                                            download={`${cert.cert_id}.pdf`} 
+                                                                            target="_blank" 
+                                                                            className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-400 text-black text-center rounded-2xl text-[11px] font-black uppercase tracking-[0.1em] transition-all flex items-center justify-center gap-2"
+                                                                        >
+                                                                            <Download className="w-4 h-4" /> Download PDF
+                                                                        </a>
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(verifyUrl);
+                                                                                alert("Verification link copied to clipboard!");
+                                                                            }}
+                                                                            className="flex-1 py-2.5 bg-muted/50 hover:bg-muted text-foreground border border-border/50 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                                                                        >
+                                                                            Copy Link
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (navigator.share) {
+                                                                                    navigator.share({ title: `Certificate - ${enr.course_name}`, url: verifyUrl }).catch(() => {});
+                                                                                } else {
+                                                                                    navigator.clipboard.writeText(verifyUrl);
+                                                                                    alert("Verification link copied!");
+                                                                                }
+                                                                            }}
+                                                                            className="px-4 py-2.5 bg-muted/50 hover:bg-muted text-foreground border border-border/50 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
+                                                                        >
+                                                                            Share
+                                                                        </button>
+                                                                    </div>
+                                                                </>
                                                             ) : (
-                                                                <div className="w-full py-4 bg-muted/50 text-muted-foreground rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed border border-border/50">
-                                                                    Waiting for Seal Minting
+                                                                <div className="w-full py-4 bg-muted/30 text-muted-foreground/60 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-border/40 cursor-not-allowed">
+                                                                    <Lock className="w-3.5 h-3.5" /> Download Locked (Admin Approval Required)
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1237,7 +1238,7 @@ function StudentDashboardContent() {
                                             <div className="col-span-full py-32 glass-panel rounded-[3rem] border border-border/50 flex flex-col items-center justify-center text-center bg-card/30">
                                                 <Award className="w-20 h-20 text-muted-foreground/10 mb-8" />
                                                 <h3 className="text-xl font-bold mb-2">No Achievements Yet</h3>
-                                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest max-w-sm px-6">Your completed courses and verifiable records will appear here.</p>
+                                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest max-w-sm px-6">Your enrolled courses and verifiable certificate records will appear here once registered.</p>
                                             </div>
                                         )}
                                 </div>

@@ -3,9 +3,42 @@ const router = express.Router();
 const db = require('../db/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// GET /api/syllabus/course/:courseId - Admin/Public course syllabus lookup
-router.get('/course/:courseId', authenticateToken, requireRole('admin'), async (req, res) => {
+// Helper to check if instructor teaches any batch for a given course
+async function verifyInstructorCourseAccess(instructorId, courseId) {
+    const [rows] = await db.execute(`SELECT id FROM batches WHERE instructor_id = ? AND course_id = ? LIMIT 1`, [instructorId, courseId]);
+    return rows.length > 0;
+}
+
+// Helper to check if instructor teaches any batch for the course associated with a module
+async function verifyInstructorModuleAccess(instructorId, moduleId) {
+    const [modRows] = await db.execute(`SELECT course_id FROM course_modules WHERE id = ?`, [moduleId]);
+    if (modRows.length === 0) return false;
+    return await verifyInstructorCourseAccess(instructorId, modRows[0].course_id);
+}
+
+// Helper to check if instructor teaches any batch for the course associated with a lesson
+async function verifyInstructorLessonAccess(instructorId, lessonId) {
+    const [lesRows] = await db.execute(`
+        SELECT cm.course_id 
+        FROM course_lessons cl 
+        JOIN course_modules cm ON cl.module_id = cm.id 
+        WHERE cl.id = ?
+    `, [lessonId]);
+    if (lesRows.length === 0) return false;
+    return await verifyInstructorCourseAccess(instructorId, lesRows[0].course_id);
+}
+
+// GET /api/syllabus/course/:courseId - Admin/Instructor course syllabus lookup
+router.get('/course/:courseId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { courseId } = req.params;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorCourseAccess(req.user.id, courseId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
+
     try {
         const [courseRows] = await db.execute(`SELECT id, name, category, description, status FROM courses WHERE id = ?`, [courseId]);
         if (courseRows.length === 0) {
@@ -40,10 +73,17 @@ router.get('/course/:courseId', authenticateToken, requireRole('admin'), async (
     }
 });
 
-// POST /api/syllabus/course/:courseId/modules - Admin create module
-router.post('/course/:courseId/modules', authenticateToken, requireRole('admin'), async (req, res) => {
+// POST /api/syllabus/course/:courseId/modules - Admin/Instructor create module
+router.post('/course/:courseId/modules', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { courseId } = req.params;
     const { title, description, sequence_order = 1, status = 'active' } = req.body;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorCourseAccess(req.user.id, courseId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Module title is required.' });
@@ -78,10 +118,17 @@ router.post('/course/:courseId/modules', authenticateToken, requireRole('admin')
     }
 });
 
-// PUT /api/syllabus/modules/:moduleId - Admin update module
-router.put('/modules/:moduleId', authenticateToken, requireRole('admin'), async (req, res) => {
+// PUT /api/syllabus/modules/:moduleId - Admin/Instructor update module
+router.put('/modules/:moduleId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { moduleId } = req.params;
     const { title, description, sequence_order, status } = req.body;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorModuleAccess(req.user.id, moduleId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Module title is required.' });
@@ -114,9 +161,17 @@ router.put('/modules/:moduleId', authenticateToken, requireRole('admin'), async 
     }
 });
 
-// DELETE /api/syllabus/modules/:moduleId - Admin delete module
-router.delete('/modules/:moduleId', authenticateToken, requireRole('admin'), async (req, res) => {
+// DELETE /api/syllabus/modules/:moduleId - Admin/Instructor delete module
+router.delete('/modules/:moduleId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { moduleId } = req.params;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorModuleAccess(req.user.id, moduleId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
+
     try {
         const [existing] = await db.execute(`SELECT id FROM course_modules WHERE id = ?`, [moduleId]);
         if (existing.length === 0) {
@@ -131,10 +186,17 @@ router.delete('/modules/:moduleId', authenticateToken, requireRole('admin'), asy
     }
 });
 
-// POST /api/syllabus/modules/:moduleId/lessons - Admin create lesson
-router.post('/modules/:moduleId/lessons', authenticateToken, requireRole('admin'), async (req, res) => {
+// POST /api/syllabus/modules/:moduleId/lessons - Admin/Instructor create lesson
+router.post('/modules/:moduleId/lessons', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { moduleId } = req.params;
     const { title, description, resource_url, video_url, sequence_order = 1, status = 'active' } = req.body;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorModuleAccess(req.user.id, moduleId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Lesson title is required.' });
@@ -169,10 +231,17 @@ router.post('/modules/:moduleId/lessons', authenticateToken, requireRole('admin'
     }
 });
 
-// PUT /api/syllabus/lessons/:lessonId - Admin update lesson
-router.put('/lessons/:lessonId', authenticateToken, requireRole('admin'), async (req, res) => {
+// PUT /api/syllabus/lessons/:lessonId - Admin/Instructor update lesson
+router.put('/lessons/:lessonId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { lessonId } = req.params;
     const { title, description, resource_url, video_url, sequence_order, status } = req.body;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorLessonAccess(req.user.id, lessonId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Lesson title is required.' });
@@ -205,9 +274,17 @@ router.put('/lessons/:lessonId', authenticateToken, requireRole('admin'), async 
     }
 });
 
-// DELETE /api/syllabus/lessons/:lessonId - Admin delete lesson
-router.delete('/lessons/:lessonId', authenticateToken, requireRole('admin'), async (req, res) => {
+// DELETE /api/syllabus/lessons/:lessonId - Admin/Instructor delete lesson
+router.delete('/lessons/:lessonId', authenticateToken, requireRole('admin', 'instructor'), async (req, res) => {
     const { lessonId } = req.params;
+
+    if (req.user.role === 'instructor') {
+        const isAssigned = await verifyInstructorLessonAccess(req.user.id, lessonId);
+        if (!isAssigned) {
+            return res.status(403).json({ error: 'Access denied. You are not assigned to any batch for this course.' });
+        }
+    }
+
     try {
         const [existing] = await db.execute(`SELECT id FROM course_lessons WHERE id = ?`, [lessonId]);
         if (existing.length === 0) {

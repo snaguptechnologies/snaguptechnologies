@@ -125,18 +125,9 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({ batch, onSuccess, onClo
                     <div className="bg-foreground text-background rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 mb-6 sm:mb-10 shadow-2xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-48 h-48 bg-background/5 rounded-full -mr-24 -mt-24 blur-3xl group-hover:bg-background/10 transition-colors" />
                         <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-1">Program Enrollment</p>
-                                    <h3 className="text-xl sm:text-2xl font-black truncate max-w-[150px] sm:max-w-[200px] tracking-tight italic">{batch.name}</h3>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-1">Net Payable</p>
-                                    <span className="text-2xl sm:text-3xl font-black italic tracking-tighter">₹{batch.price}</span>
-                                </div>
-                            </div>
-                            <div className="pt-4 border-t border-background/10">
-                                <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Transaction Fee: ₹0.00 (Standard)</p>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-1">Program Enrollment</p>
+                                <h3 className="text-xl sm:text-2xl font-black truncate max-w-[280px] sm:max-w-[360px] tracking-tight italic">{batch.name}</h3>
                             </div>
                         </div>
                     </div>

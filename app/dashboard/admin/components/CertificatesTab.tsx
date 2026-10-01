@@ -38,11 +38,18 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
     courses,
     batches = []
 }) => {
+    const [statusFilter, setStatusFilter] = useState("all");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
 
-    // Secondary filter for date range
+    // Secondary filter for date range & status
     const finalFiltered = filteredCertificates.filter(cert => {
+        if (statusFilter !== "all") {
+            const currentStatus = (cert.cert_status || cert.status || "ISSUED").toUpperCase();
+            if (statusFilter === "ISSUED" && (currentStatus === "REVOKED" || currentStatus === "PENDING")) return false;
+            if (statusFilter === "REVOKED" && currentStatus !== "REVOKED") return false;
+            if (statusFilter === "PENDING" && currentStatus !== "PENDING") return false;
+        }
         if (!startDate && !endDate) return true;
         const certDate = new Date(cert.issued_at).toISOString().split('T')[0];
         if (startDate && certDate < startDate) return false;
@@ -115,18 +122,18 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                     </select>
                 </div>
 
-                {/* Batch Filter */}
+                {/* Status Filter */}
                 <div className="relative">
                     <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <select 
-                        value={certBatchFilter}
-                        onChange={(e) => setCertBatchFilter(e.target.value)}
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
                         className="w-full bg-background/50 border border-border/50 rounded-xl pl-11 pr-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none transition-all cursor-pointer"
                     >
-                        <option value="all">All Batches</option>
-                        {uniqueBatches.map(batch => (
-                            <option key={`batch-${batch}`} value={batch as string}>{batch as string}</option>
-                        ))}
+                        <option value="all">All Statuses</option>
+                        <option value="ISSUED">ISSUED</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="REVOKED">REVOKED</option>
                     </select>
                 </div>
 
@@ -162,7 +169,7 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Credential ID</th>
                                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Student Details</th>
                                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Course & Batch</th>
-                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Release Type</th>
+                                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Status</th>
                                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Issued Date</th>
                                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Actions</th>
                             </tr>
@@ -179,13 +186,15 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                                 </tr>
                             ) : finalFiltered.length > 0 ? (
                                 finalFiltered.map((cert) => {
-                                    const isOverride = cert.release_type === 'ADMIN_OVERRIDE';
+                                    const isRevoked = cert.status === 'REVOKED' || cert.cert_status === 'REVOKED';
+                                    const verifyUrl = `${window.location.origin}/home?id=${cert.cert_id}#verify`;
+
                                     return (
                                         <tr key={cert.id} className="group hover:bg-muted/30 transition-all duration-300">
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col gap-1">
                                                     <span className="text-sm font-black text-foreground group-hover:text-primary transition-colors">{cert.cert_id}</span>
-                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Officially Verified</span>
+                                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Digital Credential</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -208,17 +217,12 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col gap-1">
                                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit border ${
-                                                        isOverride
-                                                            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                                        isRevoked
+                                                            ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                                                             : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                     }`}>
-                                                        {isOverride ? 'ADMIN_OVERRIDE' : 'AUTOMATIC'}
+                                                        {isRevoked ? 'REVOKED' : 'ISSUED / VALID'}
                                                     </span>
-                                                    {isOverride && cert.release_reason && (
-                                                        <span className="text-[9px] text-muted-foreground font-medium line-clamp-1 max-w-[200px]" title={cert.release_reason}>
-                                                            Reason: "{cert.release_reason}"
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -230,19 +234,33 @@ const CertificatesTab: React.FC<CertificatesTabProps> = ({
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button 
-                                                        onClick={() => window.open(`${BACKEND_URL}/certs/${cert.cert_id}.pdf`, '_blank')}
-                                                        className="p-2.5 bg-primary/10 border border-primary/20 text-primary rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300"
-                                                        title="View PDF"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(verifyUrl);
+                                                            alert("Verification link copied to clipboard!");
+                                                        }}
+                                                        className="p-2.5 bg-muted border border-border text-foreground rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+                                                        title="Copy Verification Link"
                                                     >
-                                                        <ExternalLink className="w-4 h-4" />
+                                                        <FileText className="w-4 h-4" />
                                                     </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteCertificate(cert.id)}
-                                                        className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all duration-300"
-                                                        title="Revoke Certificate"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {!isRevoked && (
+                                                        <button 
+                                                            onClick={() => window.open(`${BACKEND_URL}/certs/${cert.cert_id}.pdf`, '_blank')}
+                                                            className="p-2.5 bg-primary/10 border border-primary/20 text-primary rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300"
+                                                            title="View PDF"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {!isRevoked && (
+                                                        <button 
+                                                            onClick={() => handleDeleteCertificate(cert.id)}
+                                                            className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all duration-300"
+                                                            title="Revoke Certificate"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

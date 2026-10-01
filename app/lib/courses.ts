@@ -24,7 +24,7 @@ export const UPCOMING_LEARNING_CLUSTERS: CourseItem[] = [
     },
     {
         id: 2,
-        name: "Advanced Python Programming",
+        name: "Python Builders",
         category: "Software Development",
         description: "Master object-oriented architecture, metaprogramming, async workflows, functional constructs, and high-level software patterns.",
         iconName: "Terminal",

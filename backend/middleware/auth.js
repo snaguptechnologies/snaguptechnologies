@@ -1,14 +1,31 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'snagup_secret_2026';
-if (!process.env.JWT_SECRET) console.warn("⚠️ JWT_SECRET not found in environment, using default.");
+const { getJwtSecret } = require('../lib/jwtConfig');
 
 function authenticateToken(req, res, next) {
+    let token = null;
+
+    // 1. Check Authorization Bearer header
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    }
+
+    // 2. Fallback to HTTP-only cookie if header is absent
+    if (!token && req.headers.cookie) {
+        const cookieMap = {};
+        req.headers.cookie.split(';').forEach(cookieStr => {
+            const parts = cookieStr.trim().split('=');
+            if (parts.length >= 2) {
+                cookieMap[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('='));
+            }
+        });
+        token = cookieMap['snagup_token'];
+    }
+
     if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, getJwtSecret());
         req.user = decoded;
         next();
     } catch (err) {

@@ -22,26 +22,39 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 
-// Refined CORS — add your production domain to ALLOWED_ORIGINS in .env
-// e.g. ALLOWED_ORIGINS=https://snagup.com,https://www.snagup.com
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+// Production Configuration Check
+if (process.env.NODE_ENV === 'production') {
+    if (!process.env.ALLOWED_ORIGINS && !process.env.FRONTEND_URL) {
+        console.warn("⚠️ [SECURITY WARNING] Neither ALLOWED_ORIGINS nor FRONTEND_URL is configured in production environment variables! Localhost fallback active.");
+    }
+}
+
+const defaultDevOrigins = [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000', 
+    'https://localhost:3000'
+];
+
+const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-    : [
-        'http://localhost:3000', 
-        'http://127.0.0.1:3000', 
-        'https://localhost:3000',
-        process.env.FRONTEND_URL // Also include FRONTEND_URL if set
-      ].filter(Boolean);
+    : [];
+
+if (process.env.FRONTEND_URL) {
+    envOrigins.push(process.env.FRONTEND_URL.trim());
+}
+
+const allowedOrigins = Array.from(new Set([...defaultDevOrigins, ...envOrigins])).filter(Boolean);
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, etc.)
+        // Allow requests with no origin (mobile apps, server-to-server, curl, etc.)
         if (!origin) return callback(null, true);
         
-        // Dynamic origin check
-        // We support '*' for total openness or specific prefix matches
-        const isAllowed = allowedOrigins.includes('*') || 
-                         allowedOrigins.some(ao => origin.startsWith(ao));
+        // Exact origin matching after normalizing trailing slashes
+        const normalizedOrigin = origin.replace(/\/$/, '');
+        const normalizedAllowed = allowedOrigins.map(o => o.replace(/\/$/, ''));
+
+        const isAllowed = normalizedAllowed.includes(normalizedOrigin);
         
         if (isAllowed) {
             callback(null, true);
@@ -56,9 +69,36 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Serve static certificates publicly
+// Serve static certificates publicly (backward compatibility for local disk files)
 const path = require('path');
 app.use('/certs', express.static(path.join(__dirname, 'certs')));
+
+// Fallback for /certs/:filename when file is not on local disk (redirects to Supabase Signed URL)
+app.get('/certs/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const certId = filename.replace(/\.pdf$/i, '');
+        const { getSupabaseClient } = require('./lib/jwtConfig');
+        const supabase = getSupabaseClient();
+
+        if (supabase) {
+            const storagePath = `certificates/${certId}.pdf`;
+            const bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'snagup-files';
+            const { data, error } = await supabase.storage
+                .from(bucketName)
+                .createSignedUrl(storagePath, 300);
+
+            if (!error && data?.signedUrl) {
+                return res.redirect(data.signedUrl);
+            }
+        }
+        res.status(404).json({ error: 'Certificate file not found' });
+    } catch (err) {
+        console.error('Static cert fallback error:', err);
+        res.status(500).json({ error: 'Failed to fetch certificate file' });
+    }
+});
+
 app.use('/signatures', express.static(path.join(__dirname, 'signatures')));
 
 // Routes

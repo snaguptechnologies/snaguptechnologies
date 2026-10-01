@@ -430,7 +430,7 @@ export default function CourseWorkspacePage() {
 
                     <div className="flex gap-8">
                         <div className="space-y-1">
-                            <p className="text-[9px] font-black text-muted-foreground text-opacity-30 uppercase tracking-[0.2em]">Compliance</p>
+                            <p className="text-[9px] font-black text-muted-foreground text-opacity-30 uppercase tracking-[0.2em]">Attendance Compliance</p>
                             <p className="text-2xl font-black font-mono tracking-tighter text-primary">{batch.attendance.percentage}%</p>
                         </div>
                         <div className="w-px h-10 bg-muted/50 mt-auto"></div>
@@ -509,7 +509,7 @@ export default function CourseWorkspacePage() {
                                                     <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${batch.attendance.eligibleForCertificate ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-muted/80 text-muted-foreground border-border'}`}>
                                                         {batch.attendance.eligibleForCertificate ? 'Eligible' : 'Certification Restricted'}
                                                     </span>
-                                                    <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest">Requirement: 80% Attendance</span>
+                                                    <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest">Attendance Requirement</span>
                                                 </div>
                                             </div>
                                             <div className="h-1.5 bg-muted rounded-full overflow-hidden">

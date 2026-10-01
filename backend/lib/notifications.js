@@ -31,16 +31,7 @@ const processLifecycleTransitions = async () => {
     const mysqlNow = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     try {
-        // 0. AUTO-CLOSE & AUTO-START SYNC
-        await db.execute(`
-            UPDATE batches
-            SET enrollment_status = 'closed'
-            WHERE enrollment_status = 'open'
-              AND enrollment_end_date IS NOT NULL
-              AND enrollment_end_date <= ?
-              AND is_finalized = 0
-        `, [mysqlNow]);
-
+        // 0. AUTO-START SYNC
         await db.execute(`
             UPDATE batches
             SET batch_status = 'active'

@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import axios from "axios";
 import { API_ENDPOINTS } from "@/app/lib/api";
 
-const SECURITY_API_BASE = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/security` : "http://localhost:5000/api/security";
+const SECURITY_API_BASE = API_ENDPOINTS.SECURITY;
 
 export default function CyberDefenseCenterPage() {
     const [loading, setLoading] = useState(true);
